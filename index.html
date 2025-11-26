@@ -1,0 +1,1440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QVault - Live Academic Archive</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#6366f1">
+    <meta name="description" content="Access a curated archive of past papers, slides, and class notes instantly. Filter by semester, professor, or course code.">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+
+    <!-- SEO & Social -->
+    <link rel="canonical" href="https://qvault.netlify.app/">
+    <meta property="og:url" content="https://qvault.netlify.app/">
+    <meta property="og:title" content="QVault - Live Academic Archive">
+    <meta property="og:description" content="Access a curated archive of past papers, slides, and class notes instantly.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://qvault.netlify.app/icons/icon-512x512.png">
+    
+    <!-- FONTS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- TAILWIND -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        indigo: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' },
+                        slate: { 850: '#1e293b' } // Custom dark
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- SUPABASE SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        /* --- CUSTOM STYLES --- */
+        body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+       
+        .page-view { display: none; opacity: 0; transition: opacity 0.2s ease-in-out; }
+        .page-view.active { display: block; opacity: 1; }
+        
+        /* Modern Gradients */
+        .bg-gradient-primary { background: linear-gradient(135deg, #4f46e5, #4338ca); }
+        .bg-gradient-card { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); }
+        
+        /* Glass Effect */
+        .glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid rgba(226, 232, 240, 0.8); }
+        .glass-modal { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(16px); }
+
+        /* Badges */
+        .badge-base { text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; font-size: 0.65rem; padding: 0.15rem 0.5rem; border-radius: 9999px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .lab-badge { background: linear-gradient(135deg, #a78bfa, #7c3aed); color: white; }
+        .theory-badge { background: linear-gradient(135deg, #34d399, #059669); color: white; }
+        .slide-badge { background: linear-gradient(135deg, #fbbf24, #d97706); color: white; }
+        .book-badge { background: linear-gradient(135deg, #f472b6, #db2777); color: white; }
+        .note-badge { background: linear-gradient(135deg, #60a5fa, #2563eb); color: white; }
+       
+        /* Animation */
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+       
+        /* Modern Inputs */
+        .modern-input { transition: all 0.2s; border: 1px solid #e2e8f0; }
+        .modern-input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); outline: none; }
+        
+        /* Card Hover */
+        .card-modern { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 1px solid #f1f5f9; }
+        .card-modern:hover { transform: translateY(-4px); box-shadow: 0 12px 24px -10px rgba(79, 70, 229, 0.15); border-color: #e0e7ff; }
+
+        /* Drawer Classes for Animation */
+        .drawer-closed { transform: translateX(-100%); }
+        .drawer-open { transform: translateX(0); }
+        
+        /* PWA Install Prompt */
+        #install-prompt {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            z-index: 100;
+            max-width: 320px;
+            border: 1px solid #e2e8f0;
+            transform: translateY(150%);
+            transition: transform 0.3s ease;
+        }
+        #install-prompt.show {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-[100dvh] flex flex-col overflow-hidden">
+    
+    <!-- Navigation Bar -->
+    <nav class="glass sticky top-0 z-40 w-full">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 sm:h-20">
+                <!-- Logo -->
+                <div class="flex items-center cursor-pointer group" onclick="app.navigate('home')">
+                    <div class="flex-shrink-0 flex items-center gap-3">
+                        <div class="w-10 h-10 bg-gradient-primary rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-indigo-500/30 group-hover:scale-105 transition-transform duration-300">Q</div>
+                        <div class="flex flex-col">
+                            <span class="font-bold text-xl tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">QVault <span class="text-[10px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 ml-1 font-bold align-middle uppercase tracking-wide">Live</span></span>
+                            <span class="text-[10px] text-slate-400 font-medium tracking-wide">Developed by Asif Rabetul</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Desktop Menu -->
+                <div class="hidden md:flex md:items-center md:space-x-2">
+                    <div class="flex items-center bg-slate-100/50 rounded-full p-1 border border-slate-200/50 mr-4">
+                        <a href="#" onclick="event.preventDefault(); app.navigate('vault')" class="text-slate-600 hover:text-indigo-600 hover:bg-white px-4 py-2 rounded-full text-sm font-medium transition-all duration-200">
+                            Bank
+                        </a>
+                        <a href="#" onclick="event.preventDefault(); app.navigate('materials')" class="text-slate-600 hover:text-indigo-600 hover:bg-white px-4 py-2 rounded-full text-sm font-medium transition-all duration-200">
+                            Materials
+                        </a>
+                        <a href="#" onclick="event.preventDefault(); app.navigate('faculty')" class="text-slate-600 hover:text-indigo-600 hover:bg-white px-4 py-2 rounded-full text-sm font-medium transition-all duration-200">
+                            Faculty
+                        </a>
+                    </div>
+                    <a href="#" onclick="event.preventDefault(); app.toggleAdminLogin()" id="nav-admin-link" class="text-slate-400 hover:text-indigo-600 p-2 transition-colors mr-2" title="Admin">
+                        <i class="fas fa-cog"></i>
+                    </a>
+                    <button onclick="app.openUploadModal()" class="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-slate-900/20 hover:shadow-xl transition-all transform hover:-translate-y-0.5 flex items-center gap-2">
+                        <i class="fas fa-plus"></i> <span>Upload</span>
+                    </button>
+                </div>
+                <!-- Mobile Button -->
+                <div class="flex items-center md:hidden gap-3">
+                    <button onclick="app.openUploadModal()" class="text-white bg-indigo-600 shadow-indigo-500/30 shadow-md p-2.5 rounded-xl"><i class="fas fa-plus"></i></button>
+                    <button onclick="app.navigate('vault')" class="text-slate-600 bg-white border border-slate-200 p-2.5 rounded-xl"><i class="fas fa-search"></i></button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto custom-scrollbar relative bg-slate-50" id="main-container">
+       
+        <!-- Page A: Home -->
+        <section id="home-view" class="page-view active fade-in h-full">
+            <div class="relative overflow-hidden bg-white pb-12 pt-16 sm:pb-24 lg:pb-32 lg:pt-24 border-b border-slate-100">
+                <div class="absolute inset-0 z-0 opacity-30">
+                     <div class="absolute top-0 -left-4 w-72 h-72 bg-indigo-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
+                     <div class="absolute top-0 -right-4 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
+                </div>
+                <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center lg:text-left">
+                    <div class="lg:grid lg:grid-cols-12 lg:gap-8 items-center">
+                        <div class="sm:text-center md:max-w-2xl md:mx-auto lg:col-span-6 lg:text-left">
+                            <div class="inline-flex items-center px-3 py-1 rounded-full border border-indigo-100 bg-indigo-50 text-indigo-600 text-xs font-bold uppercase tracking-widest mb-4 shadow-sm">
+                                Stamford University
+                            </div>
+                            <h1 class="text-4xl tracking-tight font-extrabold text-slate-900 sm:text-5xl md:text-6xl lg:leading-tight">
+                                Unlock your <br/>
+                                <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">academic history.</span>
+                            </h1>
+                            <p class="mt-4 text-base text-slate-500 sm:mt-5 sm:text-lg md:mt-5 md:text-xl leading-relaxed">
+                                Access a curated archive of past papers, slides, and class notes instantly. Filter by semester, professor, or course code.
+                            </p>
+                            <div class="mt-8 sm:max-w-lg sm:mx-auto sm:text-center lg:text-left lg:mx-0">
+                                <div class="relative group">
+                                    <div class="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+                                    <div class="relative bg-white rounded-xl shadow-xl flex items-center p-2 border border-slate-100">
+                                        <div class="pl-4 text-slate-400"><i class="fas fa-search text-lg"></i></div>
+                                        <input type="text" class="block w-full pl-4 pr-4 py-3 bg-transparent border-none focus:ring-0 text-slate-800 placeholder-slate-400 text-lg" placeholder="Search (e.g. CSE101, Rabetul)..." onkeydown="if(event.key === 'Enter') { app.state.filters.search = this.value; app.navigate('vault'); }">
+                                        <button onclick="app.navigate('vault')" class="hidden sm:block bg-slate-900 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-slate-800 transition-colors">Find</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-8 flex gap-3 flex-wrap justify-center lg:justify-start">
+                                <button onclick="app.navigate('vault')" class="px-5 py-2.5 rounded-xl font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-colors text-sm">Question Bank</button>
+                                <button onclick="app.navigate('materials')" class="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Materials</button>
+                                <button onclick="app.navigate('faculty')" class="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Faculty</button>
+                            </div>
+                        </div>
+                        <div class="hidden lg:block lg:col-span-6">
+                            <!-- Hero Illustration/Abstract Area -->
+                            <div class="relative mx-auto w-full rounded-2xl shadow-2xl lg:max-w-md overflow-hidden border border-slate-100 bg-white">
+                                <div class="bg-slate-50 p-4 border-b border-slate-100 flex gap-2">
+                                    <div class="w-3 h-3 rounded-full bg-red-400"></div>
+                                    <div class="w-3 h-3 rounded-full bg-yellow-400"></div>
+                                    <div class="w-3 h-3 rounded-full bg-green-400"></div>
+                                </div>
+                                <div class="p-8 space-y-4">
+                                    <div class="h-4 bg-slate-100 rounded w-3/4"></div>
+                                    <div class="h-4 bg-slate-100 rounded w-1/2"></div>
+                                    <div class="grid grid-cols-2 gap-4 mt-6">
+                                        <div class="h-24 bg-indigo-50 rounded-xl border border-indigo-100"></div>
+                                        <div class="h-24 bg-purple-50 rounded-xl border border-purple-100"></div>
+                                    </div>
+                                    <div class="h-4 bg-slate-100 rounded w-full mt-6"></div>
+                                    <div class="h-4 bg-slate-100 rounded w-5/6"></div>
+                                </div>
+                                <div class="absolute bottom-0 inset-x-0 h-24 bg-gradient-to-t from-white to-transparent"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+                <div class="flex items-center justify-between mb-8">
+                    <h2 class="text-2xl font-bold text-slate-900">Just Uploaded</h2>
+                    <span class="text-sm text-slate-500">Fresh content from the community</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5" id="recent-uploads-container">
+                    <div class="col-span-full py-20 text-center">
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent"></div>
+                        <p class="mt-2 text-slate-400 text-sm">Fetching archives...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Page B: The Vault (Question Bank) -->
+        <section id="vault-view" class="page-view h-full">
+            <div class="h-full relative flex flex-col">
+                <!-- Main Grid -->
+                <div class="flex-1 bg-slate-50 p-6 lg:p-10 overflow-y-auto w-full">
+                    <div class="mb-6 flex flex-wrap gap-4 justify-between items-end">
+                        <div>
+                            <h3 class="text-2xl font-bold text-slate-900">Question Bank</h3>
+                            <p class="text-sm text-slate-500 mt-1">Browse past exam papers</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button onclick="app.openFilters('vault')" class="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl font-bold hover:bg-slate-50 hover:border-indigo-300 transition-all shadow-sm">
+                                <i class="fas fa-sliders-h text-indigo-500"></i> Filters
+                            </button>
+                            <span id="vault-count" class="bg-indigo-100 text-indigo-700 text-xs font-bold px-3 py-1 rounded-full">0</span>
+                        </div>
+                    </div>
+                    <div id="vault-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
+                    <div id="vault-empty" class="hidden flex flex-col items-center justify-center py-20 text-slate-400">
+                        <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4"><i class="fas fa-search text-2xl"></i></div>
+                        <p class="font-medium">No results found.</p>
+                        <p class="text-sm">Try adjusting your filters.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vault Filters Drawer -->
+            <div id="modal-filter-vault" class="fixed inset-0 z-50 hidden">
+                <!-- Backdrop -->
+                <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity opacity-0" id="backdrop-vault" onclick="app.closeFilters()"></div>
+                
+                <!-- Drawer -->
+                <div class="absolute inset-y-0 left-0 max-w-xs w-full bg-white shadow-2xl transform -translate-x-full transition-transform duration-300 ease-in-out flex flex-col" id="drawer-vault">
+                    <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                        <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2"><i class="fas fa-filter text-indigo-500"></i> Filters</h2>
+                        <button onclick="app.closeFilters()" class="text-slate-400 hover:text-slate-600 bg-white p-2 rounded-full shadow-sm border border-slate-100"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="p-6 overflow-y-auto flex-1 space-y-6">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wide">Refine Search</h3>
+                            <button onclick="app.resetFilters('vault')" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">RESET ALL</button>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Search</label>
+                            <div class="relative">
+                                <i class="fas fa-search absolute left-3 top-3 text-slate-400 text-sm"></i>
+                                <input type="text" id="filter-search" oninput="app.renderVault()" class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="Keywords...">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Department</label>
+                            <div class="relative">
+                                <select id="filter-dept" onchange="app.renderVault()" class="w-full pl-3 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none appearance-none cursor-pointer"><option value="">All Departments</option></select>
+                                <i class="fas fa-chevron-down absolute right-3 top-3.5 text-slate-400 text-xs pointer-events-none"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Semester</label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="relative">
+                                    <select id="filter-sem-season" onchange="app.renderVault()" class="w-full pl-3 pr-6 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option value="">Any</option><option value="Winter">Winter</option><option value="Summer">Summer</option></select>
+                                    <i class="fas fa-chevron-down absolute right-3 top-3.5 text-slate-400 text-xs pointer-events-none"></i>
+                                </div>
+                                <div class="relative">
+                                    <select id="filter-sem-year" onchange="app.renderVault()" class="w-full pl-3 pr-6 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option value="">Year</option></select>
+                                    <i class="fas fa-chevron-down absolute right-3 top-3.5 text-slate-400 text-xs pointer-events-none"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Type</label>
+                            <div class="flex bg-slate-100 p-1 rounded-lg">
+                                <label class="flex-1 text-center cursor-pointer">
+                                    <input name="ftype" type="radio" value="" checked onchange="app.renderVault()" class="peer hidden">
+                                    <span class="block py-1.5 text-xs font-semibold text-slate-500 rounded-md peer-checked:bg-white peer-checked:text-indigo-600 peer-checked:shadow-sm transition-all">All</span>
+                                </label>
+                                <label class="flex-1 text-center cursor-pointer">
+                                    <input name="ftype" type="radio" value="theory" onchange="app.renderVault()" class="peer hidden">
+                                    <span class="block py-1.5 text-xs font-semibold text-slate-500 rounded-md peer-checked:bg-white peer-checked:text-indigo-600 peer-checked:shadow-sm transition-all">Theory</span>
+                                </label>
+                                <label class="flex-1 text-center cursor-pointer">
+                                    <input name="ftype" type="radio" value="lab" onchange="app.renderVault()" class="peer hidden">
+                                    <span class="block py-1.5 text-xs font-semibold text-slate-500 rounded-md peer-checked:bg-white peer-checked:text-indigo-600 peer-checked:shadow-sm transition-all">Lab</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4 border-t border-slate-100 bg-slate-50">
+                        <button onclick="app.closeFilters()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-indigo-500/30 hover:bg-indigo-700 transition-colors">Apply Filters</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Page F: Course Materials View -->
+        <section id="materials-view" class="page-view h-full">
+            <div class="h-full relative flex flex-col">
+                 <!-- Main Grid -->
+                <div class="flex-1 bg-slate-50 p-6 lg:p-10 overflow-y-auto w-full">
+                    <div class="mb-6 flex flex-wrap gap-4 justify-between items-end">
+                        <div>
+                            <h3 class="text-2xl font-bold text-slate-900">Course Materials</h3>
+                            <p class="text-sm text-slate-500 mt-1">Slides, Books & Notes</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button onclick="app.openFilters('materials')" class="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl font-bold hover:bg-slate-50 hover:border-indigo-300 transition-all shadow-sm">
+                                <i class="fas fa-sliders-h text-indigo-500"></i> Filters
+                            </button>
+                            <span id="mat-count" class="bg-indigo-100 text-indigo-700 text-xs font-bold px-3 py-1 rounded-full">0</span>
+                        </div>
+                    </div>
+                    <div id="mat-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
+                    <div id="mat-empty" class="hidden flex flex-col items-center justify-center py-20 text-slate-400">
+                         <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4"><i class="fas fa-layer-group text-2xl"></i></div>
+                         <p class="font-medium">No materials found.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Materials Filters Drawer -->
+            <div id="modal-filter-materials" class="fixed inset-0 z-50 hidden">
+                <!-- Backdrop -->
+                <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity opacity-0" id="backdrop-materials" onclick="app.closeFilters()"></div>
+                
+                <!-- Drawer -->
+                <div class="absolute inset-y-0 left-0 max-w-xs w-full bg-white shadow-2xl transform -translate-x-full transition-transform duration-300 ease-in-out flex flex-col" id="drawer-materials">
+                    <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                        <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2"><i class="fas fa-filter text-indigo-500"></i> Filters</h2>
+                         <button onclick="app.closeFilters()" class="text-slate-400 hover:text-slate-600 bg-white p-2 rounded-full shadow-sm border border-slate-100"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="p-6 overflow-y-auto flex-1 space-y-6">
+                         <div class="flex justify-between items-center">
+                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wide">Refine Search</h3>
+                            <button onclick="app.resetFilters('materials')" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">RESET ALL</button>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Search</label>
+                            <input type="text" id="mat-filter-search" oninput="app.renderMaterials()" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="Topic, Title...">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Category</label>
+                            <div class="relative">
+                                <select id="mat-filter-type" onchange="app.renderMaterials()" class="w-full pl-3 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option value="">All Types</option><option value="book">Books</option><option value="slide">Slides</option><option value="note">Notes</option></select>
+                                <i class="fas fa-chevron-down absolute right-3 top-3.5 text-slate-400 text-xs pointer-events-none"></i>
+                            </div>
+                        </div>
+                        <div class="h-px bg-slate-100 my-4"></div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Faculty</label>
+                            <div class="relative"><select id="mat-filter-teacher" onchange="app.renderMaterials()" class="w-full pl-3 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option value="">All Faculty</option></select><i class="fas fa-chevron-down absolute right-3 top-3.5 text-slate-400 text-xs pointer-events-none"></i></div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Course</label>
+                            <div class="relative"><select id="mat-filter-course" onchange="app.renderMaterials()" class="w-full pl-3 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option value="">All Courses</option></select><i class="fas fa-chevron-down absolute right-3 top-3.5 text-slate-400 text-xs pointer-events-none"></i></div>
+                        </div>
+                        <div>
+                             <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Dept</label>
+                             <div class="relative"><select id="mat-filter-dept" onchange="app.renderMaterials()" class="w-full pl-3 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option value="">All Departments</option></select><i class="fas fa-chevron-down absolute right-3 top-3.5 text-slate-400 text-xs pointer-events-none"></i></div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Semester</label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="relative"><select id="mat-filter-sem-season" onchange="app.renderMaterials()" class="w-full pl-3 pr-6 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option value="">Any</option><option value="Winter">Winter</option><option value="Summer">Summer</option></select><i class="fas fa-chevron-down absolute right-3 top-3.5 text-slate-400 text-xs pointer-events-none"></i></div>
+                                <div class="relative"><select id="mat-filter-sem-year" onchange="app.renderMaterials()" class="w-full pl-3 pr-6 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option value="">Year</option></select><i class="fas fa-chevron-down absolute right-3 top-3.5 text-slate-400 text-xs pointer-events-none"></i></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4 border-t border-slate-100 bg-slate-50">
+                        <button onclick="app.closeFilters()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-indigo-500/30 hover:bg-indigo-700 transition-colors">Apply Filters</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Page C: Faculty Hub -->
+        <section id="faculty-view" class="page-view">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl font-extrabold text-slate-900 sm:text-4xl">Meet the Faculty</h2>
+                    <p class="mt-4 max-w-2xl mx-auto text-lg text-slate-500">Browse professors and executives to explore their course archives.</p>
+                    <div class="mt-8 max-w-2xl mx-auto">
+                        <div class="relative group">
+                            <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+                            <div class="relative bg-white rounded-xl shadow-sm flex items-center border border-slate-200">
+                                <i class="fas fa-search absolute left-4 text-slate-400"></i>
+                                <input type="text" id="faculty-filter" oninput="app.renderFaculty()" class="block w-full pl-12 pr-4 py-4 bg-transparent border-none focus:ring-0 text-slate-800 placeholder-slate-400" placeholder="Find a Professor by name...">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="faculty-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8"></div>
+            </div>
+        </section>
+
+        <!-- Page D: Teacher Profile -->
+        <section id="teacher-profile-view" class="page-view">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+                <button onclick="window.history.back()" class="mb-6 flex items-center text-slate-500 hover:text-indigo-600 font-medium transition-colors"><i class="fas fa-arrow-left mr-2"></i> Back to list</button>
+                
+                <div class="bg-white shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden mb-8 border border-slate-100">
+                    <div class="bg-gradient-primary h-32 sm:h-48 relative overflow-hidden">
+                        <div class="absolute inset-0 bg-black/10"></div>
+                        <div class="absolute -bottom-10 -right-10 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
+                    </div>
+                    <div class="px-8 pb-8 relative">
+                        <div class="flex flex-col sm:flex-row items-center sm:items-end -mt-16 sm:-mt-20 mb-6">
+                            <div class="relative h-32 w-32 sm:h-40 sm:w-40 rounded-2xl border-4 border-white shadow-lg bg-white overflow-hidden">
+                                <img id="tp-img" src="" class="h-full w-full object-cover">
+                            </div>
+                            <div class="mt-6 sm:mt-0 sm:ml-6 text-center sm:text-left flex-1">
+                                <h1 id="tp-name" class="text-3xl font-bold text-slate-900"></h1>
+                                <p id="tp-desig" class="text-indigo-600 font-bold text-sm tracking-wide uppercase mt-1"></p>
+                                <p id="tp-dept" class="text-slate-500 font-medium"></p>
+                            </div>
+                        </div>
+                        <div class="bg-slate-50 rounded-xl p-6 border border-slate-100">
+                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Biography</h4>
+                            <p id="tp-bio" class="text-slate-600 leading-relaxed max-w-4xl"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white shadow-lg shadow-slate-200/40 rounded-2xl overflow-hidden border border-slate-100">
+                    <div class="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                        <h3 class="text-lg font-bold text-slate-900">Course History</h3>
+                        <span class="text-xs font-medium text-slate-500 bg-white border border-slate-200 px-3 py-1 rounded-full">Archive</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-slate-100">
+                            <thead class="bg-slate-50">
+                                <tr>
+                                    <th class="px-8 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Semester</th>
+                                    <th class="px-8 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Course</th>
+                                    <th class="px-8 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tp-history" class="bg-white divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                    <div id="tp-empty" class="hidden px-6 py-12 text-center text-slate-400">
+                        <i class="fas fa-folder-open text-3xl mb-3 opacity-50"></i>
+                        <p>No records found for this faculty member.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Page E: Admin Dashboard -->
+        <section id="admin-view" class="page-view">
+             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+                    <div>
+                        <h2 class="text-3xl font-bold text-slate-900">Admin Dashboard</h2>
+                        <p class="text-slate-500">Manage uploads and database records.</p>
+                    </div>
+                    <button onclick="app.logout()" class="bg-white border border-red-200 text-red-600 px-5 py-2.5 rounded-xl hover:bg-red-50 transition-colors font-medium shadow-sm flex items-center">
+                        <i class="fas fa-sign-out-alt mr-2"></i> Logout
+                    </button>
+                </div>
+                
+                <!-- Modern Tabs -->
+                <div class="border-b border-slate-200 mb-8 overflow-x-auto">
+                    <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                        <button onclick="app.setAdminTab('uploads')" id="tab-uploads" class="border-indigo-500 text-indigo-600 whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm flex items-center transition-colors">
+                            Papers <span id="badge-pending" class="ml-2 bg-indigo-100 text-indigo-600 py-0.5 px-2.5 rounded-full text-xs">0</span>
+                        </button>
+                        <button onclick="app.setAdminTab('mat_uploads')" id="tab-mat_uploads" class="border-transparent text-slate-500 hover:text-slate-700 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center transition-colors">
+                            Materials <span id="badge-pending-mat" class="ml-2 bg-amber-100 text-amber-600 py-0.5 px-2.5 rounded-full text-xs">0</span>
+                        </button>
+                        <button onclick="app.setAdminTab('papers')" id="tab-papers" class="border-transparent text-slate-500 hover:text-slate-700 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">Manage Papers</button>
+                        <button onclick="app.setAdminTab('materials')" id="tab-materials" class="border-transparent text-slate-500 hover:text-slate-700 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">Manage Materials</button>
+                        <button onclick="app.setAdminTab('faculty')" id="tab-faculty" class="border-transparent text-slate-500 hover:text-slate-700 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">Manage Faculty</button>
+                    </nav>
+                </div>
+                
+                <!-- Tab: Pending Papers -->
+                <div id="adm-uploads" class="bg-white shadow-sm border border-slate-200 rounded-2xl overflow-hidden">
+                    <ul id="list-pending" class="divide-y divide-slate-100"></ul>
+                    <div id="msg-no-pending" class="hidden px-6 py-16 text-center">
+                        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4"><i class="fas fa-check text-green-600"></i></div>
+                        <p class="text-slate-500 font-medium">All caught up! No pending papers.</p>
+                    </div>
+                </div>
+
+                <!-- Tab: Pending Materials -->
+                <div id="adm-mat_uploads" class="hidden bg-white shadow-sm border border-slate-200 rounded-2xl overflow-hidden">
+                    <ul id="list-pending-mat" class="divide-y divide-slate-100"></ul>
+                    <div id="msg-no-pending-mat" class="hidden px-6 py-16 text-center">
+                        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4"><i class="fas fa-check text-green-600"></i></div>
+                        <p class="text-slate-500 font-medium">All caught up! No pending materials.</p>
+                    </div>
+                </div>
+
+                <!-- Tab: Manage Papers -->
+                <div id="adm-papers" class="hidden bg-white shadow-sm border border-slate-200 rounded-2xl overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                        <h3 class="font-bold text-slate-700">Active Database</h3>
+                        <input oninput="app.renderAdminPapers(this.value)" placeholder="Search..." class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none">
+                    </div>
+                    <table class="min-w-full divide-y divide-slate-100"><tbody id="list-papers"></tbody></table>
+                </div>
+
+                <!-- Tab: Manage Materials -->
+                <div id="adm-materials" class="hidden bg-white shadow-sm border border-slate-200 rounded-2xl overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                        <h3 class="font-bold text-slate-700">Active Database</h3>
+                        <input oninput="app.renderAdminMaterials(this.value)" placeholder="Search..." class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none">
+                    </div>
+                    <table class="min-w-full divide-y divide-slate-100"><tbody id="list-materials"></tbody></table>
+                </div>
+
+                <!-- Tab: Manage Faculty -->
+                <div id="adm-faculty" class="hidden bg-white shadow-sm border border-slate-200 rounded-2xl overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                        <h3 class="font-bold text-slate-700">Faculty Members</h3>
+                        <button onclick="app.openTeacherModal()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 transition-all">Add New</button>
+                    </div>
+                    <table class="min-w-full divide-y divide-slate-100"><tbody id="list-faculty"></tbody></table>
+                </div>
+             </div>
+        </section>
+    </main>
+
+    <!-- Credits Footer -->
+    <footer class="bg-white border-t border-slate-200 py-6 md:py-4 z-30 relative">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-end items-center gap-2">
+            <p class="text-[11px] text-slate-400 font-medium tracking-wide">Planned by Nazmus Sakib</p>
+        </div>
+    </footer>
+
+    <!-- PWA Install Prompt -->
+    <div id="install-prompt">
+        <div class="flex items-start gap-3">
+            <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
+                <i class="fas fa-download"></i>
+            </div>
+            <div class="flex-1">
+                <h3 class="font-bold text-slate-900 text-sm">Install QVault</h3>
+                <p class="text-xs text-slate-500 mt-1">Get quick access to academic resources</p>
+            </div>
+            <button onclick="pwa.hideInstallPrompt()" class="text-slate-400 hover:text-slate-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="flex gap-2 mt-3">
+            <button onclick="pwa.hideInstallPrompt()" class="flex-1 text-xs text-slate-500 hover:text-slate-700 py-2 rounded-lg transition-colors">Not Now</button>
+            <button onclick="pwa.installApp()" class="flex-1 bg-indigo-600 text-white text-xs font-bold py-2 rounded-lg hover:bg-indigo-700 transition-colors">Install</button>
+        </div>
+    </div>
+
+    <!-- Modal: Upload -->
+    <div id="modal-upload" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+            <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="app.closeModal('modal-upload')"></div>
+            <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full relative z-10">
+                <div class="bg-slate-900 pt-8 pb-16 px-8 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 -mr-4 -mt-4 w-32 h-32 bg-white/5 rounded-full blur-2xl"></div>
+                    <div class="flex justify-between items-start text-white relative z-10">
+                        <div>
+                            <h3 class="text-2xl font-bold tracking-tight">Upload Content</h3>
+                            <p class="text-slate-400 text-sm mt-1">Contribute to the academic archive.</p>
+                        </div>
+                        <button onclick="app.closeModal('modal-upload')" class="text-slate-400 hover:text-white hover:bg-white/10 rounded-full p-2 transition-colors"><i class="fas fa-times text-xl"></i></button>
+                    </div>
+                </div>
+                <div class="bg-white -mt-8 mx-4 mb-4 rounded-xl shadow-lg px-8 py-8 relative">
+                    <!-- Upload Type Toggle -->
+                    <div class="flex justify-center mb-8">
+                        <div class="bg-slate-100 p-1.5 rounded-xl inline-flex shadow-inner">
+                            <button onclick="app.setUploadType('paper')" id="btn-up-type-paper" class="px-8 py-2.5 rounded-lg text-sm font-bold shadow-sm bg-white text-indigo-600 transition-all">Question Paper</button>
+                            <button onclick="app.setUploadType('material')" id="btn-up-type-material" class="px-8 py-2.5 rounded-lg text-sm font-bold text-slate-500 hover:text-slate-700 transition-all">Course Material</button>
+                        </div>
+                    </div>
+
+                    <form onsubmit="event.preventDefault(); app.doUpload();">
+                        <input type="hidden" id="up-category" value="paper"> 
+                        
+                        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                            <div class="space-y-5">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Department</label>
+                                    <div class="relative"><select id="up-dept" class="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none appearance-none"></select><i class="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Semester & Year</label>
+                                    <div class="flex gap-3">
+                                        <div class="relative w-1/2"><select id="up-sem-season" class="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option value="Winter">Winter</option><option value="Summer">Summer</option></select><i class="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
+                                        <div class="relative w-1/2"><select id="up-sem-year" class="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"></select><i class="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Dynamic Field: Type or Exam -->
+                                <div id="div-up-type">
+                                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Course Type</label>
+                                    <div class="relative"><select id="up-type" onchange="app.updateCourseCodes(this.value)" class="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option value="theory">Theory</option><option value="lab">Lab</option></select><i class="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
+                                </div>
+                                
+                                <div id="div-up-mat-type" class="hidden">
+                                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Material Type</label>
+                                    <div class="relative"><select id="up-mat-type" class="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option value="slide">Slide/Presentation</option><option value="book">Book/PDF</option><option value="note">Class Note</option></select><i class="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
+                                </div>
+                            </div>
+                            <div class="space-y-5">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Code</label>
+                                    <div class="relative"><select id="up-code" class="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"></select><i class="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Course Name</label>
+                                    <input id="up-name" placeholder="Introduction to CS" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Details</label>
+                                    <div class="flex gap-3">
+                                        <div class="relative w-1/2" id="div-up-exam-wrap">
+                                             <select id="up-exam" class="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option>Mid</option><option>Final</option></select>
+                                             <i class="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i>
+                                        </div>
+                                        <div class="relative w-1/2 flex-1"><select id="up-teacher" class="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"></select><i class="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="sm:col-span-2 mt-2">
+                                <div class="border-2 border-dashed border-slate-300 rounded-2xl px-6 py-10 text-center hover:bg-indigo-50 hover:border-indigo-300 transition-all bg-slate-50 cursor-pointer relative group">
+                                    <input type="file" id="up-file" accept=".pdf" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="document.getElementById('fn-display').innerText = this.files[0]?.name || 'Click to select PDF'">
+                                    <div class="mx-auto h-16 w-16 text-indigo-500 bg-white rounded-full flex items-center justify-center shadow-lg shadow-indigo-100 mb-4 group-hover:scale-110 transition-transform"><i class="fas fa-cloud-upload-alt text-2xl"></i></div>
+                                    <p id="fn-display" class="text-sm text-slate-600 font-medium">Click to upload PDF (Max 200MB)</p>
+                                    <p class="text-xs text-slate-400 mt-1">Drag and drop supported</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-8 pt-6 border-t border-slate-100 flex justify-end gap-3">
+                            <button type="button" onclick="app.closeModal('modal-upload')" class="px-6 py-3 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 transition-colors">Cancel</button>
+                            <button id="btn-submit" type="submit" class="px-8 py-3 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 transition-all transform hover:-translate-y-0.5">Submit Content</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Preview -->
+    <div id="modal-preview" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm transition-opacity" onclick="app.closeModal('modal-preview')"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-5xl sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 relative">
+                    <button onclick="app.closeModal('modal-preview')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full w-8 h-8 flex items-center justify-center transition-colors"><i class="fas fa-times"></i></button>
+                    <div class="mb-4 pr-10">
+                        <h3 id="prev-title" class="text-xl leading-6 font-bold text-slate-900">Preview Document</h3>
+                    </div>
+                    <div class="bg-slate-100 rounded-xl h-[75vh] flex flex-col items-center justify-center relative overflow-hidden border border-slate-200">
+                        <iframe id="prev-frame" class="w-full h-full"></iframe>
+                    </div>
+                </div>
+                <div class="bg-slate-50 px-4 py-4 sm:px-6 sm:flex sm:flex-row-reverse border-t border-slate-100 gap-3">
+                    <button onclick="window.open(document.getElementById('prev-frame').src, '_blank')" class="w-full inline-flex justify-center rounded-xl border border-transparent shadow-lg shadow-indigo-500/20 px-6 py-2.5 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 sm:w-auto sm:text-sm transition-all">Download PDF</button>
+                    <button onclick="app.closeModal('modal-preview')" class="mt-3 w-full inline-flex justify-center rounded-xl border border-slate-300 shadow-sm px-6 py-2.5 bg-white text-base font-medium text-slate-700 hover:bg-slate-50 sm:mt-0 sm:w-auto sm:text-sm transition-all">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Teacher -->
+    <div id="modal-teacher" class="fixed inset-0 z-50 hidden flex items-center justify-center px-4">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="app.closeModal('modal-teacher')"></div>
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg z-10 p-8 transform transition-all">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-slate-900">Faculty Profile</h3>
+                <button onclick="app.closeModal('modal-teacher')" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            <form onsubmit="event.preventDefault(); app.saveTeacher();" class="space-y-5">
+                <input type="hidden" id="edit-tid">
+                <div>
+                    <input id="edit-name" required placeholder="Full Name" class="w-full border-slate-300 rounded-xl shadow-sm border p-3 focus:ring-2 focus:ring-indigo-500/20 outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <select id="edit-dept" class="w-full border-slate-300 rounded-xl border p-3 bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"></select>
+                    <input id="edit-desig" placeholder="Designation" class="w-full border-slate-300 rounded-xl border p-3 focus:ring-2 focus:ring-indigo-500/20 outline-none">
+                </div>
+                <div>
+                    <div class="flex gap-2">
+                        <input id="edit-img" placeholder="Image URL (Auto)" class="flex-1 border-slate-300 rounded-xl border p-3 bg-slate-50 text-slate-500 text-sm" readonly>
+                        <label class="bg-indigo-600 text-white px-4 rounded-xl cursor-pointer hover:bg-indigo-700 flex items-center justify-center shadow-md">
+                            <i class="fas fa-cloud-upload-alt mr-2"></i> Upload
+                            <input type="file" hidden accept="image/*" onchange="app.uploadImage(this)">
+                        </label>
+                    </div>
+                    <div id="img-status" class="text-xs text-indigo-500 mt-1 font-medium min-h-[16px]"></div>
+                </div>
+                <textarea id="edit-bio" rows="4" placeholder="Biography" class="w-full border-slate-300 rounded-xl border p-3 focus:ring-2 focus:ring-indigo-500/20 outline-none"></textarea>
+                <div class="flex justify-end pt-4">
+                    <button type="submit" class="bg-indigo-600 text-white px-8 py-2.5 rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 transition-all">Save Profile</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Login -->
+    <div id="modal-login" class="fixed inset-0 z-50 hidden flex items-center justify-center px-4">
+        <div class="absolute inset-0 bg-slate-900/95 backdrop-blur-sm" onclick="app.closeModal('modal-login')"></div>
+        <div class="bg-white rounded-3xl p-10 w-full max-w-sm z-10 text-center relative shadow-2xl overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+            <div class="mx-auto h-20 w-20 bg-slate-50 rounded-full flex items-center justify-center mb-6 shadow-inner"><i class="fas fa-lock text-slate-800 text-3xl"></i></div>
+            <h3 class="text-2xl font-bold text-slate-900 mb-2">Restricted Access</h3>
+            <p class="text-slate-500 text-sm mb-8">Please authenticate to continue.</p>
+            <form onsubmit="event.preventDefault(); app.doLogin();" class="space-y-4">
+                <input id="log-id" type="text" placeholder="Admin ID" class="w-full border-slate-200 border px-5 py-3.5 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all">
+                <input id="log-pass" type="password" placeholder="Password" class="w-full border-slate-200 border px-5 py-3.5 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all">
+                <button type="submit" class="w-full bg-slate-900 text-white py-3.5 rounded-xl font-bold hover:bg-slate-800 shadow-xl shadow-slate-900/20 transform hover:-translate-y-0.5 transition-all mt-4">Authenticate</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed top-6 right-6 z-[70] transform transition-transform duration-300 translate-x-[150%] bg-white border-l-4 border-indigo-500 shadow-2xl shadow-slate-300/50 rounded-lg p-5 flex items-start gap-4 min-w-[320px]">
+        <div id="toast-icon-wrap" class="mt-0.5"><i id="toast-icon" class="fas fa-info-circle text-indigo-500 text-xl"></i></div>
+        <div><h4 id="toast-title" class="font-bold text-slate-900 text-sm">Notification</h4><p id="toast-msg" class="text-sm text-slate-500 mt-1"></p></div>
+    </div>
+
+    <script>
+        // --- PWA FUNCTIONALITY ---
+        const pwa = {
+            deferredPrompt: null,
+            isInstalled: false,
+            
+            init: function() {
+                // Check if app is already installed
+                if (window.matchMedia('(display-mode: standalone)').matches || 
+                    window.navigator.standalone === true) {
+                    this.isInstalled = true;
+                }
+                
+                // Listen for beforeinstallprompt event
+                window.addEventListener('beforeinstallprompt', (e) => {
+                    // Prevent Chrome 67 and earlier from automatically showing the prompt
+                    e.preventDefault();
+                    // Stash the event so it can be triggered later
+                    this.deferredPrompt = e;
+                    // Show install prompt
+                    this.showInstallPrompt();
+                });
+                
+                // Listen for app installed event
+                window.addEventListener('appinstalled', (evt) => {
+                    this.isInstalled = true;
+                    this.hideInstallPrompt();
+                    app.toast('Success', 'QVault installed successfully!', 'success');
+                });
+                
+                // Register service worker for offline functionality
+                if ('serviceWorker' in navigator) {
+                    window.addEventListener('load', () => {
+                        navigator.serviceWorker.register('/sw.js')
+                            .then((registration) => {
+                                console.log('SW registered: ', registration);
+                            })
+                            .catch((registrationError) => {
+                                console.log('SW registration failed: ', registrationError);
+                            });
+                    });
+                }
+            },
+            
+            showInstallPrompt: function() {
+                if (this.isInstalled || !this.deferredPrompt) return;
+                
+                // Show prompt after a delay
+                setTimeout(() => {
+                    document.getElementById('install-prompt').classList.add('show');
+                }, 3000);
+            },
+            
+            hideInstallPrompt: function() {
+                document.getElementById('install-prompt').classList.remove('show');
+            },
+            
+            installApp: function() {
+                if (!this.deferredPrompt) return;
+                
+                // Show the install prompt
+                this.deferredPrompt.prompt();
+                
+                // Wait for the user to respond to the prompt
+                this.deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('User accepted the install prompt');
+                    } else {
+                        console.log('User dismissed the install prompt');
+                    }
+                    this.deferredPrompt = null;
+                    this.hideInstallPrompt();
+                });
+            }
+        };
+
+        // --- SUPABASE CONFIGURATION ---
+        const SUPABASE_URL = "https://imeykplylnqymupmofcb.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImltZXlrcGx5bG5xeW11cG1vZmNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4OTU1NzgsImV4cCI6MjA3OTQ3MTU3OH0.YjkgJ1eWVoM4PCP9bq8qMYKmdrqiwi2JBxk2l1woYZ4";
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const app = {
+            state: { 
+                teachers: [], 
+                papers: [], 
+                pending: [], 
+                materials: [],
+                pending_materials: [],
+                user: null, 
+                filters: { search: '', dept: '', semSeason: '', semYear: '', type: '' }
+            },
+
+            init: function() {
+                // Initialize PWA
+                pwa.init();
+                
+                window.onpopstate = (event) => {
+                    // Check if any filter modal is currently visible
+                    const vaultOpen = !document.getElementById('modal-filter-vault').classList.contains('hidden');
+                    const matOpen = !document.getElementById('modal-filter-materials').classList.contains('hidden');
+                    
+                    if (vaultOpen || matOpen) {
+                        // User pressed back with filter open. Close UI without going back in history again.
+                        app.closeFilters(true); // true = called from browser back
+                        return;
+                    }
+
+                    if (event.state && event.state.view) {
+                        this.navigate(event.state.view, false);
+                    } else {
+                        this.navigate('home', false); 
+                    }
+                };
+
+                this.populateStaticDropdowns();
+                this.startListeners();
+                
+                if(!history.state) history.replaceState({view: 'home'}, '', '#home');
+            },
+
+            startListeners: function() {
+                const fetch = async (t) => { const { data } = await supabase.from(t).select('*'); return data || []; };
+                
+                Promise.all([
+                    fetch('teachers'), 
+                    fetch('papers'), 
+                    fetch('pending_papers'),
+                    fetch('materials'),
+                    fetch('pending_materials')
+                ]).then(([t, p, pen, m, pm]) => {
+                    this.state.teachers = t; 
+                    this.state.papers = p; 
+                    this.state.pending = pen;
+                    this.state.materials = m; 
+                    this.state.pending_materials = pm;
+                    this.refreshAll();
+                });
+
+                const channel = supabase.channel('db-changes');
+                ['teachers', 'papers', 'pending_papers', 'materials', 'pending_materials'].forEach(table => {
+                    channel.on('postgres_changes', { event: '*', schema: 'public', table: table }, payload => {
+                        this.handleUpdate(table, payload);
+                    });
+                });
+                channel.subscribe();
+            },
+
+            handleUpdate: function(table, payload) {
+                const { eventType, new: newRow, old: oldRow } = payload;
+                let key = table;
+                if(table === 'pending_papers') key = 'pending';
+                
+                let list = this.state[key];
+                
+                if (list) {
+                    if (eventType === 'INSERT') {
+                        if (!list.some(i => i.id === newRow.id)) {
+                            list.push(newRow);
+                        }
+                    }
+                    else if (eventType === 'DELETE') { const idx = list.findIndex(i => i.id === oldRow.id); if(idx > -1) list.splice(idx, 1); }
+                    else if (eventType === 'UPDATE') { const idx = list.findIndex(i => i.id === newRow.id); if(idx > -1) list[idx] = newRow; }
+                    
+                    this.refreshAll();
+                }
+            },
+
+            refreshAll: function() {
+                this.renderHome(); 
+                this.renderVault(); 
+                this.renderMaterials(); 
+                this.renderFaculty();
+                this.renderAdminUploads(); 
+                this.renderAdminMaterialsUploads();
+                this.renderAdminPapers(); 
+                this.renderAdminMaterials();
+                this.renderAdminFaculty();
+                this.updateDropdowns();
+            },
+
+            // --- FILTER MODAL LOGIC ---
+            openFilters: function(type) {
+                const modalId = 'modal-filter-' + type;
+                const backdropId = 'backdrop-' + type;
+                const drawerId = 'drawer-' + type;
+                
+                document.getElementById(modalId).classList.remove('hidden');
+                
+                // Trigger animation
+                requestAnimationFrame(() => {
+                    document.getElementById(backdropId).classList.remove('opacity-0');
+                    document.getElementById(drawerId).classList.remove('-translate-x-full');
+                });
+
+                // Push history state so back button closes it
+                history.pushState({ view: type, filterOpen: true }, '', `#${type}-filters`);
+            },
+
+            closeFilters: function(fromBrowserBack = false) {
+                const openVault = !document.getElementById('modal-filter-vault').classList.contains('hidden');
+                const type = openVault ? 'vault' : 'materials';
+                if (!openVault && !document.getElementById('modal-filter-materials').classList.contains('hidden') === false) return; 
+
+                const modalId = 'modal-filter-' + type;
+                const backdropId = 'backdrop-' + type;
+                const drawerId = 'drawer-' + type;
+
+                document.getElementById(backdropId).classList.add('opacity-0');
+                document.getElementById(drawerId).classList.add('-translate-x-full');
+
+                setTimeout(() => {
+                    document.getElementById(modalId).classList.add('hidden');
+                }, 300);
+
+                if (!fromBrowserBack) {
+                    history.back(); // Remove the #filters hash state
+                }
+            },
+
+            // --- UPLOAD ---
+            setUploadType: function(type) {
+                document.getElementById('up-category').value = type;
+                const btnPaper = document.getElementById('btn-up-type-paper');
+                const btnMat = document.getElementById('btn-up-type-material');
+                const divType = document.getElementById('div-up-type');
+                const divMatType = document.getElementById('div-up-mat-type');
+                const examWrap = document.getElementById('div-up-exam-wrap');
+                
+                if(type === 'paper') {
+                    btnPaper.classList.replace('text-slate-500', 'bg-white'); btnPaper.classList.replace('hover:text-slate-700', 'text-indigo-600'); btnPaper.classList.add('shadow-sm');
+                    btnMat.classList.replace('bg-white', 'text-slate-500'); btnMat.classList.replace('text-indigo-600', 'hover:text-slate-700'); btnMat.classList.remove('shadow-sm');
+                    
+                    divType.classList.remove('hidden');
+                    divMatType.classList.add('hidden');
+                    examWrap.classList.remove('hidden'); // Show exam select
+                    // Reset widths handled by grid mostly now, but ensure structure
+                } else {
+                    btnMat.classList.replace('text-slate-500', 'bg-white'); btnMat.classList.replace('hover:text-slate-700', 'text-indigo-600'); btnMat.classList.add('shadow-sm');
+                    btnPaper.classList.replace('bg-white', 'text-slate-500'); btnPaper.classList.replace('text-indigo-600', 'hover:text-slate-700'); btnPaper.classList.remove('shadow-sm');
+                    
+                    divType.classList.add('hidden');
+                    divMatType.classList.remove('hidden');
+                    examWrap.classList.add('hidden'); // Hide exam select
+                }
+            },
+
+            doUpload: async function() {
+                const btn = document.getElementById('btn-submit'); btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+                try {
+                    const file = document.getElementById('up-file').files[0];
+                    if(!file) throw new Error("Select a PDF");
+                    
+                    const fd = new FormData(); fd.append('reqtype', 'fileupload'); fd.append('fileToUpload', file);
+                    const res = await fetch('https://corsproxy.io/?' + encodeURIComponent('https://catbox.moe/user/api.php'), { method: 'POST', body: fd });
+                    const url = await res.text();
+                    if(!url.startsWith('http')) throw new Error('Catbox Error');
+
+                    const fullSemester = document.getElementById('up-sem-season').value + ' ' + document.getElementById('up-sem-year').value;
+                    const category = document.getElementById('up-category').value;
+                    
+                    const commonData = {
+                        courseCode: document.getElementById('up-code').value, 
+                        courseName: document.getElementById('up-name').value,
+                        semester: fullSemester, 
+                        dept: document.getElementById('up-dept').value, 
+                        teacherId: document.getElementById('up-teacher').value, 
+                        fileUrl: url.trim()
+                    };
+
+                    if (category === 'paper') {
+                        await supabase.from('pending_papers').insert({
+                            ...commonData,
+                            exam: document.getElementById('up-exam').value,
+                            type: document.getElementById('up-type').value,
+                        });
+                        const { data } = await supabase.from('pending_papers').select('*');
+                        if(data) app.state.pending = data;
+                    } else {
+                        await supabase.from('pending_materials').insert({
+                            ...commonData,
+                            type: document.getElementById('up-mat-type').value,
+                        });
+                        const { data } = await supabase.from('pending_materials').select('*');
+                        if(data) app.state.pending_materials = data;
+                    }
+
+                    this.refreshAll(); 
+                    this.closeModal('modal-upload'); 
+                    this.toast('Success', 'Submitted for approval', 'success');
+                } catch(e) { this.toast('Error', e.message, 'error'); }
+                btn.disabled = false; btn.innerText = 'Submit Content';
+            },
+
+            uploadImage: async function(input) {
+                const file = input.files[0]; if(!file) return;
+                document.getElementById('img-status').innerText = 'Uploading...';
+                const fd = new FormData(); fd.append('image', file);
+                try {
+                    const res = await fetch(`https://api.imgbb.com/1/upload?key=659c558f44d89bffc201c4e258836605`, { method: 'POST', body: fd });
+                    const d = await res.json();
+                    if(d.success) { document.getElementById('edit-img').value = d.data.url; document.getElementById('img-status').innerText = 'Done'; }
+                } catch(e) { document.getElementById('img-status').innerText = 'Failed'; }
+            },
+
+            // --- UI RENDERING ---
+            renderHome: function() {
+                const latest = [...this.state.papers].sort((a,b) => new Date(b.uploadedAt) - new Date(a.uploadedAt)).slice(0,5);
+                document.getElementById('recent-uploads-container').innerHTML = latest.length ? latest.map(p => {
+                    // Try to resolve teacher
+                    const teacherObj = this.state.teachers.find(x => x.id == p.teacherId);
+                    const teacher = teacherObj ? teacherObj.name : 'Unknown';
+                    const badge = p.type === 'lab' ? '<span class="badge-base lab-badge">LAB</span>' : '<span class="badge-base theory-badge">THEORY</span>';
+                    return `
+                    <div class="bg-white rounded-2xl shadow-sm p-5 card-modern cursor-pointer flex flex-col justify-between h-full" onclick="app.preview('${p.id}')">
+                        <div>
+                            <div class="flex justify-between items-start mb-3">
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700">${p.courseCode}</span>
+                                ${badge}
+                            </div>
+                            <h3 class="font-bold text-slate-800 text-sm leading-snug line-clamp-2" title="${p.courseName}">${p.courseName}</h3>
+                        </div>
+                        <div class="mt-4 flex flex-col gap-1">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-slate-500 font-semibold">${p.semester}</span>
+                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded">${p.exam}</span>
+                            </div>
+                        </div>
+                    </div>`}).join('') : '<div class="col-span-5 text-center text-slate-400 py-10">Archive is currently empty.</div>';
+            },
+
+            renderVault: function() {
+                const s = document.getElementById('filter-search').value.toLowerCase();
+                const d = document.getElementById('filter-dept').value;
+                const semSeason = document.getElementById('filter-sem-season').value;
+                const semYear = document.getElementById('filter-sem-year').value;
+                const t = document.querySelector('input[name="ftype"]:checked').value;
+
+                const list = this.state.papers.filter(p => {
+                    const matchesSearch = !s || JSON.stringify(p).toLowerCase().includes(s);
+                    const matchesDept = !d || p.dept === d;
+                    const matchesType = !t || p.type === t;
+                    // Add checks for undefined semester
+                    const matchesSeason = !semSeason || (p.semester && p.semester.includes(semSeason));
+                    const matchesYear = !semYear || (p.semester && p.semester.includes(semYear));
+                    return matchesSearch && matchesDept && matchesType && matchesSeason && matchesYear;
+                });
+
+                document.getElementById('vault-count').innerText = list.length;
+                document.getElementById('vault-grid').innerHTML = list.map(p => {
+                    // Robust Teacher Lookup
+                    const teacherObj = this.state.teachers.find(x => x.id == p.teacherId);
+                    // Fallback to p.teacherId if it looks like a name (legacy support) or "Guest"
+                    let teacherName = teacherObj ? teacherObj.name : (isNaN(p.teacherId) ? p.teacherId : 'Guest Faculty');
+                    if(!teacherName) teacherName = 'Guest Faculty';
+
+                    const badge = p.type === 'lab' ? '<span class="badge-base lab-badge">LAB</span>' : '<span class="badge-base theory-badge">THEORY</span>';
+                    
+                    return `
+                    <div class="bg-white rounded-2xl shadow-sm card-modern flex flex-col h-full overflow-hidden">
+                        <div class="p-6 flex-1">
+                            <div class="flex justify-between items-start mb-4">
+                                <span class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700">${p.courseCode}</span>
+                                <div class="flex gap-2 items-center">
+                                    ${badge}
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">${p.exam}</span>
+                                </div>
+                            </div>
+                            <h4 class="text-lg font-bold text-slate-900 leading-tight mb-2">${p.courseName}</h4>
+                            <div class="flex items-center gap-2 mb-4">
+                                <i class="far fa-calendar text-slate-400 text-xs"></i>
+                                <span class="text-sm text-slate-600 font-bold">${p.semester || 'N/A'}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-[10px] text-indigo-700 font-bold">${teacherName.charAt(0)}</div>
+                                <span class="text-xs text-slate-700 font-bold truncate">Faculty: ${teacherName}</span>
+                            </div>
+                        </div>
+                        <div class="bg-slate-50/50 px-6 py-4 border-t border-slate-100 flex justify-between items-center">
+                            <button onclick="app.preview('${p.id}', 'paper')" class="text-sm text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-2"><i class="fas fa-eye"></i> Preview</button>
+                            <button onclick="event.stopPropagation(); app.download('${p.fileUrl}')" class="text-slate-400 hover:text-slate-600 transition-colors"><i class="fas fa-download"></i></button>
+                        </div>
+                    </div>`;
+                }).join('');
+                document.getElementById('vault-empty').classList.toggle('hidden', list.length > 0);
+            },
+
+            renderMaterials: function() {
+                const s = document.getElementById('mat-filter-search').value.toLowerCase();
+                const d = document.getElementById('mat-filter-dept').value;
+                const semSeason = document.getElementById('mat-filter-sem-season').value;
+                const semYear = document.getElementById('mat-filter-sem-year').value;
+                const tid = document.getElementById('mat-filter-teacher').value;
+                const course = document.getElementById('mat-filter-course').value;
+                const type = document.getElementById('mat-filter-type').value;
+
+                const list = this.state.materials.filter(p => {
+                    const matchesSearch = !s || JSON.stringify(p).toLowerCase().includes(s);
+                    const matchesDept = !d || p.dept === d;
+                    const matchesSeason = !semSeason || (p.semester && p.semester.includes(semSeason));
+                    const matchesYear = !semYear || (p.semester && p.semester.includes(semYear));
+                    const matchesTeacher = !tid || p.teacherId == tid;
+                    const matchesCourse = !course || p.courseCode == course;
+                    const matchesType = !type || p.type === type;
+                    return matchesSearch && matchesDept && matchesSeason && matchesYear && matchesTeacher && matchesCourse && matchesType;
+                });
+
+                document.getElementById('mat-count').innerText = list.length;
+                document.getElementById('mat-grid').innerHTML = list.map(p => {
+                     // Robust Teacher Lookup
+                    const teacherObj = this.state.teachers.find(x => x.id == p.teacherId);
+                    let teacherName = teacherObj ? teacherObj.name : (isNaN(p.teacherId) ? p.teacherId : 'Guest Faculty');
+                    if(!teacherName) teacherName = 'Guest Faculty';
+
+                    let typeLabel = 'Material';
+                    let badgeClass = 'slide-badge'; 
+
+                    if(p.type === 'slide') { typeLabel = 'SLIDE'; badgeClass = 'slide-badge'; }
+                    else if(p.type === 'book') { typeLabel = 'BOOK'; badgeClass = 'book-badge'; }
+                    else if(p.type === 'note') { typeLabel = 'NOTE'; badgeClass = 'note-badge'; }
+
+                    return `
+                    <div class="bg-white rounded-2xl shadow-sm card-modern flex flex-col h-full overflow-hidden">
+                        <div class="p-6 flex-1">
+                            <div class="flex justify-between items-start mb-4">
+                                <span class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700">${p.courseCode}</span>
+                                <span class="badge-base ${badgeClass}">${typeLabel}</span>
+                            </div>
+                            <h4 class="text-lg font-bold text-slate-900 leading-tight mb-2">${p.courseName}</h4>
+                            <div class="flex items-center gap-2 mb-4">
+                                <i class="far fa-clock text-slate-400 text-xs"></i>
+                                <span class="text-sm text-slate-600 font-bold">Sem: ${p.semester || 'N/A'}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] text-slate-600 font-bold"><i class="fas fa-user"></i></div>
+                                <span class="text-xs text-slate-700 font-bold truncate">Faculty: ${teacherName}</span>
+                            </div>
+                        </div>
+                        <div class="bg-slate-50/50 px-6 py-4 border-t border-slate-100 flex justify-between items-center">
+                            <button onclick="app.preview('${p.id}', 'material')" class="text-sm text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-2"><i class="fas fa-eye"></i> Preview</button>
+                            <button onclick="event.stopPropagation(); app.download('${p.fileUrl}')" class="text-slate-400 hover:text-slate-600 transition-colors"><i class="fas fa-download"></i></button>
+                        </div>
+                    </div>`;
+                }).join('');
+                document.getElementById('mat-empty').classList.toggle('hidden', list.length > 0);
+            },
+
+            renderFaculty: function() {
+                const q = document.getElementById('faculty-filter').value.toLowerCase();
+                document.getElementById('faculty-grid').innerHTML = this.state.teachers.filter(t => t.name.toLowerCase().includes(q)).map(t => `
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 flex flex-col items-center text-center card-modern group cursor-pointer" onclick="app.openProfile('${t.id}')">
+                        <div class="relative w-28 h-28 mb-5">
+                            <div class="absolute inset-0 bg-indigo-100 rounded-full blur-lg opacity-50 group-hover:opacity-75 transition-opacity"></div>
+                            <img class="relative w-28 h-28 rounded-full object-cover border-4 border-white shadow-md" src="${t.img || 'https://via.placeholder.com/150'}">
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">${t.name}</h3>
+                        <p class="text-xs font-bold text-indigo-500 uppercase tracking-wide mt-1">${t.dept}</p>
+                        <p class="text-sm text-slate-400 mt-2 line-clamp-2">${t.designation}</p>
+                        <button class="mt-6 text-xs font-bold text-indigo-600 bg-indigo-50 px-6 py-2.5 rounded-full group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-sm">View Profile</button>
+                    </div>`).join('');
+            },
+
+            // --- ADMIN ---
+            renderAdminUploads: function() {
+                const list = this.state.pending;
+                document.getElementById('badge-pending').innerText = list.length;
+                document.getElementById('list-pending').innerHTML = list.map(p => `
+                    <li class="px-6 py-5 hover:bg-slate-50 flex flex-col sm:flex-row justify-between items-center gap-4 transition-colors">
+                        <div>
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">${p.courseCode}</span>
+                                <span class="text-xs font-medium text-slate-500">${p.semester}</span>
+                                <span class="text-xs font-bold text-slate-400 uppercase border border-slate-200 px-1.5 rounded">${p.type}</span>
+                            </div>
+                            <div class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                                ${p.courseName}
+                                <a href="${p.fileUrl}" target="_blank" class="text-xs text-indigo-500 hover:underline"><i class="fas fa-external-link-alt"></i></a>
+                            </div>
+                        </div>
+                        <div class="flex space-x-3">
+                            <button onclick="app.approvePaper('${p.id}')" class="bg-green-100 text-green-700 hover:bg-green-200 px-4 py-2 rounded-lg text-xs font-bold transition-colors">Approve</button>
+                            <button onclick="app.rejectPaper('${p.id}')" class="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded-lg text-xs font-bold transition-colors">Reject</button>
+                        </div>
+                    </li>`).join('');
+                document.getElementById('msg-no-pending').classList.toggle('hidden', list.length > 0);
+            },
+
+            renderAdminMaterialsUploads: function() {
+                const list = this.state.pending_materials;
+                document.getElementById('badge-pending-mat').innerText = list.length;
+                document.getElementById('list-pending-mat').innerHTML = list.map(p => `
+                    <li class="px-6 py-5 hover:bg-slate-50 flex flex-col sm:flex-row justify-between items-center gap-4 transition-colors">
+                        <div>
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">${p.courseCode}</span>
+                                <span class="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded uppercase">${p.type}</span>
+                            </div>
+                            <div class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                                ${p.courseName}
+                                <a href="${p.fileUrl}" target="_blank" class="text-xs text-indigo-500 hover:underline"><i class="fas fa-external-link-alt"></i></a>
+                            </div>
+                        </div>
+                        <div class="flex space-x-3">
+                            <button onclick="app.approveMaterial('${p.id}')" class="bg-green-100 text-green-700 hover:bg-green-200 px-4 py-2 rounded-lg text-xs font-bold transition-colors">Approve</button>
+                            <button onclick="app.rejectMaterial('${p.id}')" class="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded-lg text-xs font-bold transition-colors">Reject</button>
+                        </div>
+                    </li>`).join('');
+                document.getElementById('msg-no-pending-mat').classList.toggle('hidden', list.length > 0);
+            },
+
+            renderAdminPapers: function(s='') {
+                document.getElementById('list-papers').innerHTML = this.state.papers.filter(p=>JSON.stringify(p).toLowerCase().includes(s.toLowerCase())).map(p => `
+                    <tr class="hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0"><td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-700">${p.courseCode}</td><td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600"><div class="font-medium">${p.courseName}</div><div class="text-xs text-slate-400">${p.semester}</div></td><td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"><button onclick="app.deletePaper('${p.id}')" class="text-red-400 hover:text-red-600 transition-colors p-2"><i class="fas fa-trash-alt"></i></button></td></tr>
+                `).join('');
+            },
+
+            renderAdminMaterials: function(s='') {
+                document.getElementById('list-materials').innerHTML = this.state.materials.filter(p=>JSON.stringify(p).toLowerCase().includes(s.toLowerCase())).map(p => `
+                    <tr class="hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0"><td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-700">${p.courseCode}</td><td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600"><div class="font-medium">${p.courseName} <span class="text-xs text-slate-400">(${p.type})</span></div><div class="text-xs text-slate-400">${p.semester}</div></td><td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"><button onclick="app.deleteMaterial('${p.id}')" class="text-red-400 hover:text-red-600 transition-colors p-2"><i class="fas fa-trash-alt"></i></button></td></tr>
+                `).join('');
+            },
+
+            renderAdminFaculty: function() {
+                document.getElementById('list-faculty').innerHTML = this.state.teachers.map(t => `
+                    <tr class="hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0"><td class="px-6 py-4 whitespace-nowrap"><div class="flex items-center"><div class="h-10 w-10 flex-shrink-0"><img class="h-10 w-10 rounded-full object-cover border border-slate-200" src="${t.img||'https://via.placeholder.com/40'}"></div><div class="ml-4"><div class="text-sm font-bold text-slate-900">${t.name}</div><div class="text-xs text-slate-500">${t.dept}</div></div></div></td><td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"><button onclick="app.openTeacherModal('${t.id}')" class="text-indigo-600 hover:text-indigo-900 mr-4 font-semibold">Edit</button><button onclick="app.deleteTeacher('${t.id}')" class="text-red-400 hover:text-red-600"><i class="fas fa-trash-alt"></i></button></td></tr>
+                `).join('');
+            },
+
+            // --- ADMIN ACTIONS (Logic Unchanged) ---
+            approvePaper: async function(id) {
+                const p = this.state.pending.find(x => x.id === id); if(!p) return;
+                const { id:_, uploadedAt:__, ...d } = p;
+                await supabase.from('papers').insert(d); await supabase.from('pending_papers').delete().eq('id', id);
+                this.toast('Approved', 'Paper added to database', 'success');
+            },
+            rejectPaper: async function(id) { if(confirm('Reject this paper?')) await supabase.from('pending_papers').delete().eq('id', id); },
+            deletePaper: async function(id) { if(confirm('Delete this paper permanently?')) await supabase.from('papers').delete().eq('id', id); },
+            
+            approveMaterial: async function(id) {
+                const p = this.state.pending_materials.find(x => x.id === id); if(!p) return;
+                const { id:_, uploadedAt:__, ...d } = p;
+                await supabase.from('materials').insert(d); await supabase.from('pending_materials').delete().eq('id', id);
+                this.toast('Approved', 'Material added to database', 'success');
+            },
+            rejectMaterial: async function(id) { if(confirm('Reject this material?')) await supabase.from('pending_materials').delete().eq('id', id); },
+            deleteMaterial: async function(id) { if(confirm('Delete this material permanently?')) await supabase.from('materials').delete().eq('id', id); },
+
+            saveTeacher: async function() {
+                const id = document.getElementById('edit-tid').value;
+                const data = { name: document.getElementById('edit-name').value, dept: document.getElementById('edit-dept').value, designation: document.getElementById('edit-desig').value, img: document.getElementById('edit-img').value, bio: document.getElementById('edit-bio').value };
+                if(id) await supabase.from('teachers').update(data).eq('id', id); else await supabase.from('teachers').insert(data);
+                this.closeModal('modal-teacher');
+            },
+            deleteTeacher: async function(id) { if(confirm('Delete this faculty member?')) await supabase.from('teachers').delete().eq('id', id); },
+
+            // --- HELPERS (Logic Unchanged) ---
+            navigate: function(v, push = true) {
+                if(v==='admin' && !this.state.user) return document.getElementById('modal-login').classList.remove('hidden');
+                
+                document.querySelectorAll('.page-view').forEach(e=>e.classList.remove('active')); 
+                document.getElementById(v+'-view').classList.add('active');
+                
+                if(push) window.history.pushState({ view: v }, '', '#' + v);
+            },
+            openProfile: function(id) {
+                const t = this.state.teachers.find(x => x.id == id); if(!t) return;
+                document.getElementById('tp-name').innerText = t.name; document.getElementById('tp-desig').innerText = t.designation; document.getElementById('tp-dept').innerText = t.dept; document.getElementById('tp-bio').innerText = t.bio; document.getElementById('tp-img').src = t.img || 'https://via.placeholder.com/150';
+                
+                const hist = this.state.papers.filter(p => p.teacherId == id);
+                document.getElementById('tp-history').innerHTML = hist.map(p => `<tr><td class="px-8 py-4 text-sm font-medium text-slate-900">${p.semester}</td><td class="px-8 py-4 text-sm text-slate-500"><span class="font-bold mr-2 text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">${p.courseCode}</span>${p.courseName}</td><td class="px-8 py-4 text-right"><button onclick="app.preview('${p.id}', 'paper')" class="text-indigo-600 hover:text-indigo-800 font-semibold hover:underline">View PDF</button></td></tr>`).join('');
+                document.getElementById('tp-empty').classList.toggle('hidden', hist.length > 0);
+                this.navigate('teacher-profile');
+            },
+            preview: (id, type='paper') => { 
+                const collection = type === 'material' ? app.state.materials : app.state.papers;
+                const p = collection.find(x => x.id == id); 
+                if(p) {
+                    document.getElementById('prev-frame').src = p.fileUrl; 
+                    document.getElementById('modal-preview').classList.remove('hidden'); 
+                }
+            },
+            download: (url) => window.open(url, '_blank'),
+            closeModal: (id) => document.getElementById(id).classList.add('hidden'),
+            openUploadModal: () => {
+                document.getElementById('modal-upload').classList.remove('hidden');
+                app.setUploadType('paper');
+            },
+            toggleAdminLogin: function() {
+                if (this.state.user) {
+                    this.navigate('admin');
+                } else {
+                    document.getElementById('modal-login').classList.remove('hidden');
+                    setTimeout(() => document.getElementById('log-id').focus(), 100); 
+                }
+            },
+            doLogin: () => { if(document.getElementById('log-id').value === 'admin' && document.getElementById('log-pass').value === 'admin') { app.state.user = 'admin'; app.closeModal('modal-login'); app.navigate('admin'); app.setAdminTab('uploads'); } },
+            logout: () => { app.state.user = null; app.navigate('home'); },
+            setAdminTab: (t) => { 
+                ['uploads','mat_uploads','papers','materials','faculty'].forEach(x => { 
+                    const div = document.getElementById('adm-'+x);
+                    const btn = document.getElementById('tab-'+x);
+                    if(div && btn) {
+                        div.classList.add('hidden'); 
+                        btn.classList.remove('border-indigo-500', 'text-indigo-600', 'font-bold'); 
+                        btn.classList.add('border-transparent', 'text-slate-500', 'font-medium');
+                    }
+                });
+                document.getElementById('adm-'+t).classList.remove('hidden'); 
+                const actBtn = document.getElementById('tab-'+t);
+                actBtn.classList.remove('border-transparent', 'text-slate-500', 'font-medium');
+                actBtn.classList.add('border-indigo-500', 'text-indigo-600', 'font-bold');
+            },
+            openTeacherModal: (id=null) => { 
+                document.querySelector('#modal-teacher form').reset(); document.getElementById('edit-tid').value=''; document.getElementById('edit-img').value=''; 
+                if(id) { const t = app.state.teachers.find(x => x.id == id); document.getElementById('edit-tid').value=t.id; document.getElementById('edit-name').value=t.name; document.getElementById('edit-dept').value=t.dept; document.getElementById('edit-desig').value=t.designation; document.getElementById('edit-bio').value=t.bio; document.getElementById('edit-img').value=t.img; }
+                document.getElementById('modal-teacher').classList.remove('hidden'); 
+            },
+            updateCourseCodes: (t) => { document.getElementById('up-code').innerHTML = (t==='theory' ? ['CSE101','CSE102','MAT101'] : ['CSE105','CSE106']).map(c => `<option>${c}</option>`).join(''); },
+            populateStaticDropdowns: () => { 
+                const deptsList = [
+                    'Business Administration', 'Pharmacy', 'Microbiology', 'Environmental Science', 'English', 'Economics', 'Film and Media Studies', 'Journalism and Media Studies', 'Public Administration', 'Law', 'Computer Science & Engineering', 'Electrical & Electronic Engineering', 'Civil Engineering', 'Architecture'
+                ];
+                const depts = deptsList.map(d => `<option ${d === 'Computer Science & Engineering' ? 'selected' : ''}>${d}</option>`).join('');
+                ['up-dept', 'filter-dept', 'edit-dept', 'mat-filter-dept'].forEach(id => { const el = document.getElementById(id); if(el) el.innerHTML += depts; });
+                
+                let yearsHtmlUpload = '';
+                for(let y = 2020; y <= 2030; y++) { yearsHtmlUpload += `<option value="${y}" ${y === 2025 ? 'selected' : ''}>${y}</option>`; }
+                const yearSelect = document.getElementById('up-sem-year');
+                if(yearSelect) yearSelect.innerHTML = yearsHtmlUpload;
+
+                let yearsHtmlFilter = '';
+                for(let y = 2020; y <= 2030; y++) { yearsHtmlFilter += `<option value="${y}">${y}</option>`; }
+                ['filter-sem-year', 'mat-filter-sem-year'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).innerHTML += yearsHtmlFilter; });
+
+                app.updateCourseCodes('theory');
+            },
+            updateDropdowns: () => { 
+                const teacherOpts = app.state.teachers.map(t => `<option value="${t.id}">${t.name}</option>`).join(''); 
+                const upTeacher = document.getElementById('up-teacher');
+                if(upTeacher && upTeacher.options.length <= 1) { upTeacher.innerHTML = `<option value="Additional" selected>Additional</option>` + teacherOpts; }
+                if(document.getElementById('mat-filter-teacher')) document.getElementById('mat-filter-teacher').innerHTML = `<option value="">All Faculty</option>` + teacherOpts;
+
+                const uniqueCodes = [...new Set(app.state.materials.map(m => m.courseCode))].sort();
+                const courseOpts = uniqueCodes.map(c => `<option value="${c}">${c}</option>`).join('');
+                if(document.getElementById('mat-filter-course')) document.getElementById('mat-filter-course').innerHTML = `<option value="">All Courses</option>` + courseOpts;
+            },
+            resetFilters: (section) => { 
+                if(section === 'vault') {
+                    document.getElementById('filter-search').value=''; 
+                    document.getElementById('filter-dept').value=''; 
+                    document.getElementById('filter-sem-season').value='';
+                    document.getElementById('filter-sem-year').value=''; 
+                    app.renderVault(); 
+                } else if (section === 'materials') {
+                    document.getElementById('mat-filter-search').value=''; 
+                    document.getElementById('mat-filter-dept').value=''; 
+                    document.getElementById('mat-filter-sem-season').value='';
+                    document.getElementById('mat-filter-sem-year').value=''; 
+                    document.getElementById('mat-filter-teacher').value=''; 
+                    document.getElementById('mat-filter-course').value=''; 
+                    document.getElementById('mat-filter-type').value=''; 
+                    app.renderMaterials(); 
+                }
+            },
+            toast: (t, m, type) => { 
+                const toast = document.getElementById('toast'); 
+                const iconWrap = document.getElementById('toast-icon-wrap');
+                const borderClass = type === 'error' ? 'border-red-500' : 'border-indigo-500';
+                
+                toast.className = `fixed top-6 right-6 z-[70] transform transition-transform duration-300 bg-white border-l-4 ${borderClass} shadow-2xl shadow-slate-300/50 rounded-lg p-5 flex items-start gap-4 min-w-[320px]`;
+                iconWrap.innerHTML = `<i class="fas ${type==='error'?'fa-exclamation-circle text-red-500':'fa-check-circle text-indigo-500'} text-xl"></i>`;
+                document.getElementById('toast-title').innerText = t;
+                document.getElementById('toast-msg').innerText = m;
+                
+                toast.style.transform = 'translateX(0)'; 
+                setTimeout(() => toast.style.transform = 'translateX(150%)', 3000); 
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => app.init());
+    </script>
+</body>
+</html>
