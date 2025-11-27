@@ -22,7 +22,7 @@ export default function HomePage() {
   }
 
   const getTeacherName = (teacherId: string) => {
-    const teacher = teachers.find(t => t.id === teacherId)
+    const teacher = teachers.find((t: any) => t.id === teacherId)
     return teacher?.name || 'Unknown'
   }
 
@@ -87,7 +87,7 @@ export default function HomePage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Just Uploaded</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {latestPapers.length > 0 ? latestPapers.map(paper => (
+          {latestPapers.length > 0 ? latestPapers.map((paper: any) => (
             <div 
               key={paper.id}
               className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow cursor-pointer border border-gray-100 card-hover"

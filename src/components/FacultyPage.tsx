@@ -7,12 +7,12 @@ export default function FacultyPage() {
   const { teachers, papers, setCurrentView } = useAppStore()
   const [searchTerm, setSearchTerm] = useState('')
 
-  const filteredTeachers = teachers.filter(teacher => 
+  const filteredTeachers = teachers.filter((teacher: any) => 
     teacher.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   const getPaperCount = (teacherId: string) => {
-    return papers.filter(paper => paper.teacherId === teacherId).length
+    return papers.filter((paper: any) => paper.teacherId === teacherId).length
   }
 
   const openProfile = (id: string) => {
@@ -42,7 +42,7 @@ export default function FacultyPage() {
       </div>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {filteredTeachers.map(teacher => (
+        {filteredTeachers.map((teacher: any) => (
           <div 
             key={teacher.id}
             className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col items-center text-center hover:shadow-md transition-shadow cursor-pointer group card-hover" 

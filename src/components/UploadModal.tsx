@@ -184,7 +184,7 @@ export default function UploadModal({ isOpen, onClose }: { isOpen: boolean; onCl
                         required
                       >
                         <option value="">Select Teacher</option>
-                        {teachers.map(teacher => (
+                        {teachers.map((teacher: any) => (
                           <option key={teacher.id} value={teacher.id}>{teacher.name}</option>
                         ))}
                       </select>

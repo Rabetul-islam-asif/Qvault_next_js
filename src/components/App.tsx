@@ -27,7 +27,7 @@ export default function App() {
   
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [loginModalOpen, setLoginModalOpen] = useState(false)
-  const [toast, setToast] = useState({ isVisible: false, title: '', message: '', type: 'info' as const })
+  const [toast, setToast] = useState({ isVisible: false, title: '', message: '', type: 'info' as 'info' | 'success' | 'error' })
 
   useEffect(() => {
     // Initial data fetch

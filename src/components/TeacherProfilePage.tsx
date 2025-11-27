@@ -15,7 +15,7 @@ export default function TeacherProfilePage() {
     
     if (id) {
       setTeacherId(id)
-      const foundTeacher = teachers.find(t => t.id === id)
+      const foundTeacher = teachers.find((t: any) => t.id === id)
       setTeacher(foundTeacher || null)
     }
   }, [teachers])
@@ -26,7 +26,7 @@ export default function TeacherProfilePage() {
 
   const getTeacherHistory = () => {
     if (!teacherId) return []
-    return papers.filter(paper => paper.teacherId === teacherId)
+    return papers.filter((paper: any) => paper.teacherId === teacherId)
   }
 
   if (!teacher) {
@@ -87,7 +87,7 @@ export default function TeacherProfilePage() {
               </tr>
             </thead>
             <tbody id="tp-history" className="bg-white divide-y divide-gray-200">
-              {teacherHistory.map(paper => (
+              {teacherHistory.map((paper: any) => (
                 <tr key={paper.id}>
                   <td className="px-6 py-4 text-sm font-medium text-gray-900">{paper.semester}</td>
                   <td className="px-6 py-4 text-sm text-gray-500">

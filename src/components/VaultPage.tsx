@@ -6,7 +6,7 @@ import { departments, seasons, years } from '@/lib/constants'
 export default function VaultPage() {
   const { papers, teachers, filters, setFilters, resetFilters } = useAppStore()
 
-  const filteredPapers = papers.filter(paper => {
+  const filteredPapers = papers.filter((paper: any) => {
     const searchMatch = !filters.search || 
       JSON.stringify(paper).toLowerCase().includes(filters.search.toLowerCase())
     const deptMatch = !filters.dept || paper.dept === filters.dept
@@ -28,7 +28,7 @@ export default function VaultPage() {
   }
 
   const getTeacherName = (teacherId: string) => {
-    const teacher = teachers.find(t => t.id === teacherId)
+    const teacher = teachers.find((t: any) => t.id === teacherId)
     return teacher?.name || 'Unknown'
   }
 
@@ -146,7 +146,7 @@ export default function VaultPage() {
         
         {filteredPapers.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredPapers.map(paper => (
+            {filteredPapers.map((paper: any) => (
               <div key={paper.id} className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-full transition-all duration-200 hover:shadow-md hover:-translate-y-1 overflow-hidden group">
                 <div className="p-5 flex-1 flex flex-col">
                   <div className="flex justify-between items-start mb-3">
