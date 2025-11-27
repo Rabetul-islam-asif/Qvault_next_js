@@ -18,13 +18,13 @@ export default function AdminDashboard() {
   }
 
   const handleApprovePaper = async (id: string) => {
-    const paper = pending.find(p => p.id === id)
+    const paper = pending.find((p: any) => p.id === id)
     if (!paper) return
     
     try {
       await approvePaper(id, paper)
       // Refresh data
-      setPending(pending.filter(p => p.id !== id))
+      setPending(pending.filter((p: any) => p.id !== id))
       setPapers([...papers, { ...paper, id: Date.now().toString(), uploadedAt: new Date().toISOString() }])
     } catch (error) {
       console.error('Approval failed:', error)
@@ -37,7 +37,7 @@ export default function AdminDashboard() {
     
     try {
       await rejectPaper(id)
-      setPending(pending.filter(p => p.id !== id))
+      setPending(pending.filter((p: any) => p.id !== id))
     } catch (error) {
       console.error('Rejection failed:', error)
       alert('Rejection failed')
@@ -49,7 +49,7 @@ export default function AdminDashboard() {
     
     try {
       await deletePaper(id)
-      setPapers(papers.filter(p => p.id !== id))
+      setPapers(papers.filter((p: any) => p.id !== id))
     } catch (error) {
       console.error('Deletion failed:', error)
       alert('Deletion failed')
@@ -61,7 +61,7 @@ export default function AdminDashboard() {
     
     try {
       await deleteTeacher(id)
-      setTeachers(teachers.filter(t => t.id !== id))
+      setTeachers(teachers.filter((t: any) => t.id !== id))
     } catch (error) {
       console.error('Deletion failed:', error)
       alert('Deletion failed')
@@ -98,11 +98,11 @@ export default function AdminDashboard() {
   }
 
   const getTeacherName = (teacherId: string) => {
-    const teacher = teachers.find(t => t.id === teacherId)
+    const teacher = teachers.find((t: any) => t.id === teacherId)
     return teacher?.name || 'Unknown'
   }
 
-  const filteredPapers = papers.filter(paper => 
+  const filteredPapers = papers.filter((paper: any) => 
     JSON.stringify(paper).toLowerCase().includes(paperSearch.toLowerCase())
   )
 
@@ -156,7 +156,7 @@ export default function AdminDashboard() {
       {/* Pending Uploads */}
       <div className={`bg-white shadow overflow-hidden sm:rounded-md ${activeTab !== 'uploads' ? 'hidden' : ''}`}>
         <ul className="divide-y divide-gray-200">
-          {pending.length > 0 ? pending.map(paper => (
+          {pending.length > 0 ? pending.map((paper: any) => (
             <li key={paper.id} className="px-6 py-4 hover:bg-gray-50 flex flex-col sm:flex-row justify-between items-center gap-4">
               <div>
                 <div className="flex items-center gap-2 mb-2">
@@ -212,7 +212,7 @@ export default function AdminDashboard() {
         </div>
         <table className="min-w-full divide-y divide-gray-200">
           <tbody>
-            {filteredPapers.map(paper => (
+            {filteredPapers.map((paper: any) => (
               <tr key={paper.id}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                   {paper.courseCode}
@@ -248,7 +248,7 @@ export default function AdminDashboard() {
         </div>
         <table className="min-w-full divide-y divide-gray-200">
           <tbody>
-            {teachers.map(teacher => (
+            {teachers.map((teacher: any) => (
               <tr key={teacher.id}>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
@@ -283,8 +283,7 @@ export default function AdminDashboard() {
 
       {/* Teacher Modal */}
       {teacherModalOpen && (
-        <div className="fixed inset-0 z-50 hidden flex items-center justify-center" style={{ display: 'flex' }}>
-          <div className="absolute inset-0 bg-gray-900/80 backdrop-blur-sm" onClick={() => setTeacherModalOpen(false)}></div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg z-10 p-6 m-4">
             <div className="flex justify-between items-center mb-5">
               <h3 className="text-lg font-bold text-gray-900">Faculty Profile</h3>
