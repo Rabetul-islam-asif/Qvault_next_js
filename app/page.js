@@ -83,19 +83,22 @@ export default function QVaultApp() {
     const [user, setUser] = useState(null); // 'admin' or null
     const [deferredPrompt, setDeferredPrompt] = useState(null);
     const [showInstallModal, setShowInstallModal] = useState(false);
+    const [adminTab, setAdminTab] = useState('uploads');
     
-    // Modals State
+    // Missing State Variables
     const [showUploadModal, setShowUploadModal] = useState(false);
     const [showPreviewModal, setShowPreviewModal] = useState(false);
+    const [previewUrl, setPreviewUrl] = useState('');
     const [showTeacherModal, setShowTeacherModal] = useState(false);
+    const [teacherForm, setTeacherForm] = useState({ id: '', name: '', dept: DEPARTMENTS[10], desig: '', bio: '', img: '', courses: [] });
+    const [imgStatus, setImgStatus] = useState('');
+    const [newCourseCode, setNewCourseCode] = useState('');
+    const [newCourseOngoing, setNewCourseOngoing] = useState(false);
     const [showLoginModal, setShowLoginModal] = useState(false);
     const [showVaultFilter, setShowVaultFilter] = useState(false);
     const [showMaterialsFilter, setShowMaterialsFilter] = useState(false);
-
-    // Data for Modals/Views
-    const [previewUrl, setPreviewUrl] = useState('');
     const [teacherProfileId, setTeacherProfileId] = useState(null);
-    const [adminTab, setAdminTab] = useState('uploads');
+    const [homeSearchQuery, setHomeSearchQuery] = useState('');
     
     // New State for Course List
     const [courseListDept, setCourseListDept] = useState('Computer Science & Engineering');
@@ -316,10 +319,7 @@ export default function QVaultApp() {
     };
 
     // --- TEACHER PROFILE LOGIC ---
-    const [teacherForm, setTeacherForm] = useState({ id: '', name: '', dept: DEPARTMENTS[10], desig: '', bio: '', img: '', courses: [] });
-    const [imgStatus, setImgStatus] = useState('');
-    const [newCourseCode, setNewCourseCode] = useState('');
-    const [newCourseOngoing, setNewCourseOngoing] = useState(false);
+
 
     const handleTeacherImgUpload = async (e) => {
         const file = e.target.files[0];
@@ -428,6 +428,39 @@ export default function QVaultApp() {
                                             <button onClick={() => setView('materials')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Materials</button>
                                             <button onClick={() => setView('faculty')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Faculty</button>
                                         </div>
+
+                                        <div className="mt-8 relative max-w-lg">
+                                            <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl blur opacity-25"></div>
+                                            <div className="relative bg-white rounded-xl shadow-xl p-2 flex items-center border border-slate-100">
+                                                <i className="fas fa-search text-slate-400 ml-4 text-lg"></i>
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Search for courses, papers..." 
+                                                    className="flex-1 bg-transparent border-none focus:ring-0 text-slate-700 placeholder-slate-400 h-12 px-4 text-base font-medium"
+                                                    value={homeSearchQuery}
+                                                    onChange={(e) => setHomeSearchQuery(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' && homeSearchQuery.trim()) {
+                                                            setFilters(prev => ({ ...prev, vault: { ...prev.vault, search: homeSearchQuery } }));
+                                                            setView('vault');
+                                                        }
+                                                    }}
+                                                />
+                                                <button 
+                                                    onClick={() => {
+                                                        if (homeSearchQuery.trim()) {
+                                                            setFilters(prev => ({ ...prev, vault: { ...prev.vault, search: homeSearchQuery } }));
+                                                            setView('vault');
+                                                        }
+                                                    }}
+                                                    className="bg-slate-900 text-white px-6 py-3 rounded-lg font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20"
+                                                >
+                                                    Find
+                                                </button>
+                                            </div>
+                                        </div>
+
+
                                     </div>
                                     <div className="hidden lg:block lg:col-span-6">
                                         <div className="relative mx-auto w-full rounded-2xl shadow-2xl lg:max-w-md overflow-hidden border border-slate-100 bg-white h-64 flex items-center justify-center bg-slate-50">
@@ -645,178 +678,165 @@ export default function QVaultApp() {
                         </div>
                     </div>
                 )}
-
                 {/* TEACHER PROFILE VIEW */}
-                {view === 'teacher-profile' && teacherProfileId && (
-                    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+                {view === 'teacher-profile' && (
+                    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
                         {(() => {
                             const t = teachers.find(x => x.id == teacherProfileId);
-                            if (!t) return null;
-                            const manualCourses = t.courses ? t.courses : [];
-                            const paperCourses = [...new Set(papers.filter(p => p.teacherId == teacherProfileId).map(p => JSON.stringify({ code: p.courseCode, name: p.courseName, semester: p.semester })))].map(s => JSON.parse(s));
-                            const coursesToDisplay = manualCourses.length > 0 ? manualCourses : paperCourses;
-
+                            if (!t) return <div className="text-center py-20">Profile not found</div>;
                             return (
-                                <>
-                                    <button onClick={() => setView('faculty')} className="mb-6 flex items-center text-slate-500 hover:text-indigo-600 font-medium transition-colors"><i className="fas fa-arrow-left mr-2"></i> Back to list</button>
-                                    <div className="bg-white shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden mb-8 border border-slate-100">
-                                        <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 h-32 sm:h-48 relative overflow-hidden"></div>
-                                        <div className="px-8 pb-8 relative">
-                                            <div className="flex flex-col sm:flex-row items-center sm:items-end -mt-16 sm:-mt-20 mb-6">
-                                                <div className="relative h-32 w-32 sm:h-40 sm:w-40 rounded-2xl border-4 border-white shadow-lg bg-white overflow-hidden">
-                                                    <img src={t.img || 'https://via.placeholder.com/150'} className="h-full w-full object-cover" />
+                                <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
+                                    <div className="bg-slate-900 h-32 relative">
+                                        <button onClick={() => setView('faculty')} className="absolute top-6 left-6 text-white/80 hover:text-white flex items-center gap-2 font-bold transition-colors"><i className="fas fa-arrow-left"></i> Back</button>
+                                    </div>
+                                    <div className="px-8 pb-8">
+                                        <div className="relative -mt-16 mb-6 flex flex-col items-center sm:items-start sm:flex-row gap-6">
+                                            <div className="relative">
+                                                <div className="absolute inset-0 bg-indigo-500 rounded-full blur opacity-50"></div>
+                                                <img className="relative w-32 h-32 rounded-full border-4 border-white shadow-lg object-cover bg-white" src={t.img || 'https://via.placeholder.com/150'} alt={t.name} />
+                                            </div>
+                                            <div className="text-center sm:text-left pt-16 sm:pt-0 sm:mt-16 flex-1">
+                                                <h2 className="text-3xl font-bold text-slate-900">{t.name}</h2>
+                                                <p className="text-indigo-600 font-bold uppercase tracking-wide text-sm mt-1">{t.dept}</p>
+                                                <p className="text-slate-500 font-medium">{t.designation}</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                            <div className="lg:col-span-2 space-y-8">
+                                                <div>
+                                                    <h3 className="text-lg font-bold text-slate-900 mb-3 flex items-center gap-2"><i className="fas fa-user-circle text-indigo-500"></i> Biography</h3>
+                                                    <p className="text-slate-600 leading-relaxed text-sm whitespace-pre-line">{t.bio || "No biography available."}</p>
                                                 </div>
-                                                <div className="mt-6 sm:mt-0 sm:ml-6 text-center sm:text-left flex-1">
-                                                    <h1 className="text-3xl font-bold text-slate-900">{t.name}</h1>
-                                                    <p className="text-indigo-600 font-bold text-sm tracking-wide uppercase mt-1">{t.designation}</p>
-                                                    <p className="text-slate-500 font-medium">{t.dept}</p>
+                                                
+                                                <div>
+                                                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2"><i className="fas fa-history text-indigo-500"></i> Course History</h3>
+                                                    <div className="space-y-3">
+                                                        {(t.courses || []).length > 0 ? (
+                                                            t.courses.map((c, i) => (
+                                                                <div key={i} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50 hover:bg-white hover:shadow-md transition-all group">
+                                                                    <div className="flex items-center gap-4">
+                                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm ${c.ongoing ? 'bg-emerald-500' : 'bg-slate-400'}`}>{c.code.slice(-3)}</div>
+                                                                        <div>
+                                                                            <div className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors">{c.name}</div>
+                                                                            <div className="text-xs text-slate-500 font-mono">{c.code}</div>
+                                                                        </div>
+                                                                    </div>
+                                                                    {c.ongoing && <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 uppercase tracking-wide">Ongoing</span>}
+                                                                </div>
+                                                            ))
+                                                        ) : (
+                                                            <p className="text-slate-400 italic text-sm">No course history added.</p>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="bg-slate-50 rounded-xl p-6 border border-slate-100">
-                                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Biography</h4>
-                                                <p className="text-slate-600 leading-relaxed max-w-4xl">{t.bio}</p>
+
+                                            <div className="space-y-6">
+                                                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
+                                                    <h3 className="font-bold text-slate-900 mb-4">Quick Stats</h3>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="bg-white p-4 rounded-xl shadow-sm text-center">
+                                                            <div className="text-2xl font-bold text-indigo-600">{papers.filter(p => p.teacherId == t.id).length}</div>
+                                                            <div className="text-xs text-slate-500 font-bold uppercase mt-1">Papers</div>
+                                                        </div>
+                                                        <div className="bg-white p-4 rounded-xl shadow-sm text-center">
+                                                            <div className="text-2xl font-bold text-purple-600">{materials.filter(m => m.teacherId == t.id).length}</div>
+                                                            <div className="text-xs text-slate-500 font-bold uppercase mt-1">Materials</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white shadow-lg">
+                                                    <h3 className="font-bold text-lg mb-2">Contribute</h3>
+                                                    <p className="text-indigo-100 text-sm mb-4">Have materials from {t.name}? Upload them to help others.</p>
+                                                    <button onClick={() => { setUploadType('paper'); setUploadFormData(prev => ({ ...prev, teacherId: t.id })); setShowUploadModal(true); }} className="w-full bg-white text-indigo-600 font-bold py-3 rounded-xl hover:bg-indigo-50 transition-colors shadow-sm">Upload Content</button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="bg-white shadow-lg shadow-slate-200/40 rounded-2xl overflow-hidden border border-slate-100">
-                                        <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                                            <h3 className="text-lg font-bold text-slate-900">Course History</h3>
-                                            <span className="text-xs font-medium text-slate-500 bg-white border border-slate-200 px-3 py-1 rounded-full">Archive</span>
-                                        </div>
-                                        <div className="overflow-x-auto">
-                                            <table className="min-w-full divide-y divide-slate-100">
-                                                <thead className="bg-slate-50">
-                                                    <tr>
-                                                        <th className="px-8 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Semester</th>
-                                                        <th className="px-8 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Course</th>
-                                                        <th className="px-8 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Action</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="bg-white divide-y divide-slate-100">
-                                                    {coursesToDisplay.map((p, i) => (
-                                                        <tr key={i}>
-                                                            <td className="px-8 py-4 text-sm font-medium text-slate-900">{p.semester || (p.ongoing ? <span className="text-green-600 bg-green-50 px-2 py-0.5 rounded text-xs uppercase font-bold">Ongoing</span> : 'Past')}</td>
-                                                            <td className="px-8 py-4 text-sm text-slate-500"><span className="font-bold mr-2 text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{p.code || p.courseCode}</span>{p.name || p.courseName}</td>
-                                                            <td className="px-8 py-4 text-right">
-                                                                {p.fileUrl ? (
-                                                                    <button onClick={() => { setPreviewUrl(p.fileUrl); setShowPreviewModal(true); }} className="text-indigo-600 hover:text-indigo-800 font-semibold hover:underline">View PDF</button>
-                                                                ) : <span className="text-slate-400 text-xs">No File</span>}
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                        {coursesToDisplay.length === 0 && <div className="px-6 py-12 text-center text-slate-400"><p>No records found for this faculty member.</p></div>}
-                                    </div>
-                                </>
+                                </div>
                             );
                         })()}
                     </div>
                 )}
 
                 {/* ADMIN DASHBOARD */}
-                {view === 'admin' && user && (
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-                            <div><h2 className="text-3xl font-bold text-slate-900">Admin Dashboard</h2><p className="text-slate-500">Manage uploads and records.</p></div>
-                            <button onClick={() => { setUser(null); setView('home'); }} className="bg-white border border-red-200 text-red-600 px-5 py-2.5 rounded-xl hover:bg-red-50 transition-colors font-medium shadow-sm flex items-center"><i className="fas fa-sign-out-alt mr-2"></i> Logout</button>
+                {view === 'admin' && (
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 h-full flex flex-col">
+                        <div className="flex justify-between items-center mb-8">
+                            <div><h2 className="text-3xl font-extrabold text-slate-900">Admin Dashboard</h2><p className="text-slate-500 mt-1">Manage content and faculty.</p></div>
+                            <button onClick={() => { setUser(null); setView('home'); }} className="text-red-500 hover:text-red-700 font-bold text-sm bg-red-50 px-4 py-2 rounded-xl transition-colors">Logout</button>
                         </div>
-                        <div className="border-b border-slate-200 mb-8 overflow-x-auto">
-                            <nav className="-mb-px flex space-x-6">
-                                {['uploads', 'mat_uploads', 'papers', 'materials', 'faculty'].map(tab => (
-                                    <button key={tab} onClick={() => setAdminTab(tab)} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center transition-colors ${adminTab === tab ? 'border-indigo-500 text-indigo-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
-                                        {tab === 'uploads' ? 'Papers' : tab === 'mat_uploads' ? 'Materials' : tab.charAt(0).toUpperCase() + tab.slice(1)}
-                                        {(tab === 'uploads' || tab === 'mat_uploads') && <span className={`ml-2 py-0.5 px-2.5 rounded-full text-xs ${adminTab === tab ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-600'}`}>{tab === 'uploads' ? pendingPapers.length : pendingMaterials.length}</span>}
-                                    </button>
+                        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden flex flex-col flex-1">
+                            <div className="flex border-b border-slate-200">
+                                {['uploads', 'faculty'].map(tab => (
+                                    <button key={tab} onClick={() => setAdminTab(tab)} className={`flex-1 py-4 text-sm font-bold uppercase tracking-wide transition-all ${adminTab === tab ? 'bg-indigo-50 text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>{tab}</button>
                                 ))}
-                            </nav>
-                        </div>
-                        <div className="bg-white shadow-sm border border-slate-200 rounded-2xl overflow-hidden">
+                            </div>
                             {adminTab === 'uploads' && (
-                                <ul className="divide-y divide-slate-100">
-                                    {pendingPapers.length === 0 && <div className="px-6 py-16 text-center text-slate-500">All caught up! No pending papers.</div>}
-                                    {pendingPapers.map(p => (
-                                        <li key={p.id} className="px-6 py-5 hover:bg-slate-50 flex flex-col sm:flex-row justify-between items-center gap-4">
-                                            <div>
-                                                <div className="flex items-center gap-3 mb-2">
-                                                    <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{p.courseCode}</span>
-                                                    <span className="text-xs font-medium text-slate-500">{p.semester}</span>
-                                                    <span className="text-xs font-bold text-slate-400 uppercase border border-slate-200 px-1.5 rounded">{p.type}</span>
+                                <div className="flex-1 overflow-y-auto p-6">
+                                    <div className="space-y-8">
+                                        <div>
+                                            <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><i className="fas fa-clock text-amber-500"></i> Pending Approvals</h3>
+                                            {pendingPapers.length === 0 && pendingMaterials.length === 0 ? (
+                                                <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-400 text-sm">No pending items.</div>
+                                            ) : (
+                                                <div className="space-y-3">
+                                                    {[...pendingPapers.map(p => ({...p, _type: 'paper'})), ...pendingMaterials.map(m => ({...m, _type: 'material'}))].map(item => (
+                                                        <div key={item.id} className="flex items-center justify-between p-4 bg-amber-50 border border-amber-100 rounded-xl">
+                                                            <div>
+                                                                <div className="font-bold text-slate-800 text-sm"><span className="uppercase text-[10px] bg-white border border-amber-200 px-1.5 py-0.5 rounded text-amber-600 mr-2 font-extrabold tracking-wider">{item._type}</span> {item.courseName}</div>
+                                                                <div className="text-xs text-slate-500 mt-1">{item.courseCode} • {item.semester} • {getTeacherName(item.teacherId)}</div>
+                                                                <a href={item.fileUrl} target="_blank" className="text-xs text-indigo-600 hover:underline mt-1 block">View File</a>
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <button onClick={() => approveItem(item, item._type)} className="bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-600 shadow-sm">Approve</button>
+                                                                <button onClick={() => rejectItem(item.id, item._type)} className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-600 shadow-sm">Reject</button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                                <div className="text-sm font-semibold text-slate-900 flex items-center gap-2">{p.courseName} <a href={p.fileUrl} target="_blank" rel="noreferrer" className="text-xs text-indigo-500 hover:underline"><i className="fas fa-external-link-alt"></i></a></div>
+                                            )}
+                                        </div>
+                                        
+                                        <div>
+                                            <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><i className="fas fa-database text-indigo-500"></i> Database Content</h3>
+                                            <div className="flex gap-4 mb-4">
+                                                <input placeholder="Search database..." className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none" onChange={e => setFilters(prev => ({ ...prev, adminPaper: { search: e.target.value } }))} />
                                             </div>
-                                            <div className="flex space-x-3">
-                                                <button onClick={() => approveItem(p, 'paper')} className="bg-green-100 text-green-700 hover:bg-green-200 px-4 py-2 rounded-lg text-xs font-bold">Approve</button>
-                                                <button onClick={() => rejectItem(p.id, 'paper')} className="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded-lg text-xs font-bold">Reject</button>
+                                            <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                                                <table className="min-w-full divide-y divide-slate-200">
+                                                    <thead className="bg-slate-100">
+                                                        <tr>
+                                                            <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Course</th>
+                                                            <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Type</th>
+                                                            <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Action</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="bg-white divide-y divide-slate-100">
+                                                        {[...papers.map(p => ({...p, _type: 'paper'})), ...materials.map(m => ({...m, _type: 'material'}))]
+                                                        .filter(i => i.courseName.toLowerCase().includes(filters.adminPaper.search.toLowerCase()) || i.courseCode.toLowerCase().includes(filters.adminPaper.search.toLowerCase()))
+                                                        .slice(0, 50)
+                                                        .map(item => (
+                                                            <tr key={item.id} className="hover:bg-slate-50">
+                                                                <td className="px-6 py-4 whitespace-nowrap"><div className="text-sm font-bold text-slate-900">{item.courseCode}</div><div className="text-xs text-slate-500 truncate max-w-xs">{item.courseName}</div></td>
+                                                                <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2 py-1 inline-flex text-[10px] leading-5 font-bold rounded-full ${item._type === 'paper' ? 'bg-indigo-100 text-indigo-800' : 'bg-purple-100 text-purple-800'} uppercase`}>{item._type}</span></td>
+                                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"><button onClick={() => deleteItem(item.id, item._type === 'paper' ? 'papers' : 'materials')} className="text-red-400 hover:text-red-600"><i className="fas fa-trash-alt"></i></button></td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
                                             </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                            {adminTab === 'mat_uploads' && (
-                                <ul className="divide-y divide-slate-100">
-                                    {pendingMaterials.length === 0 && <div className="px-6 py-16 text-center text-slate-500">All caught up! No pending materials.</div>}
-                                    {pendingMaterials.map(p => (
-                                        <li key={p.id} className="px-6 py-5 hover:bg-slate-50 flex flex-col sm:flex-row justify-between items-center gap-4">
-                                            <div>
-                                                <div className="flex items-center gap-3 mb-2">
-                                                    <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{p.courseCode}</span>
-                                                    <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded uppercase">{p.type}</span>
-                                                </div>
-                                                <div className="text-sm font-semibold text-slate-900 flex items-center gap-2">{p.courseName} <a href={p.fileUrl} target="_blank" rel="noreferrer" className="text-xs text-indigo-500 hover:underline"><i className="fas fa-external-link-alt"></i></a></div>
-                                            </div>
-                                            <div className="flex space-x-3">
-                                                <button onClick={() => approveItem(p, 'material')} className="bg-green-100 text-green-700 hover:bg-green-200 px-4 py-2 rounded-lg text-xs font-bold">Approve</button>
-                                                <button onClick={() => rejectItem(p.id, 'material')} className="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded-lg text-xs font-bold">Reject</button>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                            {adminTab === 'papers' && (
-                                <div>
-                                    <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                                        <h3 className="font-bold text-slate-700">Active Database</h3>
-                                        <input onInput={(e) => setFilters(prev => ({...prev, adminPaper: { search: e.target.value }}))} placeholder="Search..." className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+                                        </div>
                                     </div>
-                                    <table className="min-w-full divide-y divide-slate-100">
-                                        <tbody>
-                                            {papers.filter(p => JSON.stringify(p).toLowerCase().includes(filters.adminPaper.search.toLowerCase())).map(p => (
-                                                <tr key={p.id} className="hover:bg-slate-50">
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-700">{p.courseCode}</td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600"><div className="font-medium">{p.courseName}</div><div className="text-xs text-slate-400">{p.semester}</div></td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"><button onClick={() => deleteItem(p.id, 'papers')} className="text-red-400 hover:text-red-600"><i className="fas fa-trash-alt"></i></button></td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                            {adminTab === 'materials' && (
-                                <div>
-                                    <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                                        <h3 className="font-bold text-slate-700">Active Database</h3>
-                                        <input onInput={(e) => setFilters(prev => ({...prev, adminMaterial: { search: e.target.value }}))} placeholder="Search..." className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none" />
-                                    </div>
-                                    <table className="min-w-full divide-y divide-slate-100">
-                                        <tbody>
-                                            {materials.filter(p => JSON.stringify(p).toLowerCase().includes(filters.adminMaterial.search.toLowerCase())).map(p => (
-                                                <tr key={p.id} className="hover:bg-slate-50">
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-700">{p.courseCode}</td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600"><div className="font-medium">{p.courseName}</div><div className="text-xs text-slate-400">{p.semester} ({p.type})</div></td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"><button onClick={() => deleteItem(p.id, 'materials')} className="text-red-400 hover:text-red-600"><i className="fas fa-trash-alt"></i></button></td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
                                 </div>
                             )}
                             {adminTab === 'faculty' && (
                                 <div>
                                     <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                                         <h3 className="font-bold text-slate-700">Faculty Members</h3>
-                                        <button onClick={() => { setTeacherForm({ id: '', name: '', dept: DEPARTMENTS[10], desig: '', bio: '', img: '' }); setShowTeacherModal(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 transition-all">Add New</button>
+                                        <button onClick={() => { setTeacherForm({ id: '', name: '', dept: DEPARTMENTS[10], desig: '', bio: '', img: '', courses: [] }); setShowTeacherModal(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 transition-all">Add New</button>
                                     </div>
                                     <table className="min-w-full divide-y divide-slate-100">
                                         <tbody>
