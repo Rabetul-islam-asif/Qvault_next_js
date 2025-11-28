@@ -436,7 +436,7 @@ export default function QVaultApp() {
                                                 <input 
                                                     type="text" 
                                                     placeholder="Search for courses, papers..." 
-                                                    className="flex-1 bg-transparent border-none focus:ring-0 text-slate-700 placeholder-slate-400 h-12 px-4 text-base font-medium"
+                                                    className="flex-1 bg-transparent border-none focus:ring-0 outline-none text-slate-700 placeholder-slate-400 h-12 px-4 text-base font-medium"
                                                     value={homeSearchQuery}
                                                     onChange={(e) => setHomeSearchQuery(e.target.value)}
                                                     onKeyDown={(e) => {
