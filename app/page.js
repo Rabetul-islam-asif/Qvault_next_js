@@ -316,8 +316,10 @@ export default function QVaultApp() {
     };
 
     // --- TEACHER PROFILE LOGIC ---
-    const [teacherForm, setTeacherForm] = useState({ id: '', name: '', dept: DEPARTMENTS[10], desig: '', bio: '', img: '' });
+    const [teacherForm, setTeacherForm] = useState({ id: '', name: '', dept: DEPARTMENTS[10], desig: '', bio: '', img: '', courses: [] });
     const [imgStatus, setImgStatus] = useState('');
+    const [newCourseCode, setNewCourseCode] = useState('');
+    const [newCourseOngoing, setNewCourseOngoing] = useState(false);
 
     const handleTeacherImgUpload = async (e) => {
         const file = e.target.files[0];
@@ -983,12 +985,13 @@ export default function QVaultApp() {
             {showTeacherModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowTeacherModal(false)}></div>
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg z-10 p-8 transform transition-all">
-                        <div className="flex justify-between items-center mb-6">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg z-10 flex flex-col max-h-[90vh] overflow-hidden transform transition-all">
+                        <div className="flex justify-between items-center p-6 border-b border-slate-100 bg-white">
                             <h3 className="text-xl font-bold text-slate-900">Faculty Profile</h3>
                             <button onClick={() => setShowTeacherModal(false)} className="text-slate-400 hover:text-slate-600"><i className="fas fa-times text-xl"></i></button>
                         </div>
-                        <div className="space-y-5">
+                        
+                        <div className="p-6 overflow-y-auto custom-scrollbar space-y-5">
                             <input placeholder="Full Name" value={teacherForm.name} onChange={e => setTeacherForm({ ...teacherForm, name: e.target.value })} className="w-full border-slate-300 rounded-xl shadow-sm border p-3 focus:ring-2 focus:ring-indigo-500/20 outline-none" />
                             <div className="grid grid-cols-2 gap-4">
                                 <select value={teacherForm.dept} onChange={e => setTeacherForm({ ...teacherForm, dept: e.target.value })} className="w-full border-slate-300 rounded-xl border p-3 bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none">{DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}</select>
@@ -1001,8 +1004,52 @@ export default function QVaultApp() {
                                 </div>
                                 <div className="text-xs text-indigo-500 mt-1 font-medium min-h-[16px]">{imgStatus}</div>
                             </div>
-                            <textarea rows="4" placeholder="Biography" value={teacherForm.bio} onChange={e => setTeacherForm({ ...teacherForm, bio: e.target.value })} className="w-full border-slate-300 rounded-xl border p-3 focus:ring-2 focus:ring-indigo-500/20 outline-none"></textarea>
-                            <div className="flex justify-end pt-4"><button onClick={saveTeacher} className="bg-indigo-600 text-white px-8 py-2.5 rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 transition-all">Save Profile</button></div>
+                            <textarea rows="2" placeholder="Biography" value={teacherForm.bio} onChange={e => setTeacherForm({ ...teacherForm, bio: e.target.value })} className="w-full border-slate-300 rounded-xl border p-3 focus:ring-2 focus:ring-indigo-500/20 outline-none"></textarea>
+                            
+                            <div className="border-t border-slate-100 pt-5 mt-2">
+                                <h4 className="text-sm font-bold text-slate-900 mb-3">Manage Course History</h4>
+                                <div className="flex gap-2 mb-4">
+                                    <div className="relative flex-1">
+                                        <select value={newCourseCode} onChange={e => setNewCourseCode(e.target.value)} className="w-full border-slate-300 rounded-xl border p-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none">
+                                            <option value="">Select Course...</option>
+                                            {COURSE_DB.sort((a,b) => a.code.localeCompare(b.code)).map(c => <option key={c.code} value={c.code}>{c.code} - {c.name}</option>)}
+                                        </select>
+                                        <i className="fas fa-chevron-down absolute right-3 top-3.5 text-slate-400 text-xs pointer-events-none"></i>
+                                    </div>
+                                    <div className="relative w-32">
+                                        <select value={newCourseOngoing ? 'ongoing' : 'history'} onChange={e => setNewCourseOngoing(e.target.value === 'ongoing')} className="w-full border-slate-300 rounded-xl border p-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none">
+                                            <option value="history">History</option>
+                                            <option value="ongoing">Ongoing</option>
+                                        </select>
+                                        <i className="fas fa-chevron-down absolute right-3 top-3.5 text-slate-400 text-xs pointer-events-none"></i>
+                                    </div>
+                                    <button onClick={() => {
+                                        if (!newCourseCode) return;
+                                        const course = COURSE_DB.find(c => c.code === newCourseCode);
+                                        const newEntry = { code: course.code, name: course.name, ongoing: newCourseOngoing };
+                                        setTeacherForm(prev => ({ ...prev, courses: [...(prev.courses || []), newEntry] }));
+                                        setNewCourseCode('');
+                                        setNewCourseOngoing(false);
+                                    }} className="bg-slate-800 text-white px-4 rounded-xl text-sm font-bold hover:bg-slate-900 transition-colors">Add</button>
+                                </div>
+                                <div className="space-y-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
+                                    {(teacherForm.courses || []).map((c, i) => (
+                                        <div key={i} className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                            <div className="flex items-center gap-2 overflow-hidden">
+                                                {c.ongoing && <span className="text-[10px] font-bold text-green-600 bg-green-100 px-1.5 py-0.5 rounded uppercase">Ongoing</span>}
+                                                <span className="text-xs font-bold text-slate-500">{c.code}</span>
+                                                <span className="text-xs text-slate-700 truncate">{c.name}</span>
+                                            </div>
+                                            <button onClick={() => setTeacherForm(prev => ({ ...prev, courses: prev.courses.filter((_, idx) => idx !== i) }))} className="text-red-400 hover:text-red-600 p-1"><i className="fas fa-times"></i></button>
+                                        </div>
+                                    ))}
+                                    {(!teacherForm.courses || teacherForm.courses.length === 0) && <p className="text-xs text-slate-400 text-center py-2">No manual courses added.</p>}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end">
+                            <button onClick={saveTeacher} className="bg-indigo-600 text-white px-8 py-2.5 rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 transition-all">Save Profile</button>
                         </div>
                     </div>
                 </div>
