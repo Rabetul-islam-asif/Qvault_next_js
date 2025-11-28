@@ -104,7 +104,7 @@ export default function QVaultApp() {
     const [uploadType, setUploadType] = useState('paper'); // 'paper' or 'material'
     const [uploadFormData, setUploadFormData] = useState({
         dept: 'Computer Science & Engineering',
-        semSeason: 'Winter',
+        semSeason: 'Fall',
         semYear: '2025',
         type: 'theory', // course type
         matType: 'slide', // material type
@@ -282,7 +282,7 @@ export default function QVaultApp() {
         e.preventDefault();
         const id = e.target.elements.id.value;
         const pass = e.target.elements.pass.value;
-        if (id === 'sub=admin' && pass === 'admin2025') {
+        if (id === 'sub-admin' && pass === 'admin2025') {
             setUser('admin');
             setShowLoginModal(false);
             setView('admin');
@@ -888,7 +888,7 @@ export default function QVaultApp() {
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Semester & Year</label>
                                             <div className="flex gap-3">
-                                                <div className="relative w-1/2"><select value={uploadFormData.semSeason} onChange={e => handleUploadChange('semSeason', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option>Winter</option><option>Summer</option></select><i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
+                                                <div className="relative w-1/2"><select value={uploadFormData.semSeason} onChange={e => handleUploadChange('semSeason', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option>Fall</option><option>Summer</option><option>Spring</option></select><i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
                                                 <div className="relative w-1/2"><select value={uploadFormData.semYear} onChange={e => handleUploadChange('semYear', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none">{Array.from({ length: 11 }, (_, i) => 2020 + i).map(y => <option key={y}>{y}</option>)}</select><i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
                                             </div>
                                         </div>
@@ -1047,7 +1047,7 @@ export default function QVaultApp() {
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Semester</label>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <select value={filters.vault.semSeason} onChange={e => setFilters(prev => ({ ...prev, vault: { ...prev.vault, semSeason: e.target.value } }))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"><option value="">Any</option><option>Winter</option><option>Summer</option></select>
+                                    <select value={filters.vault.semSeason} onChange={e => setFilters(prev => ({ ...prev, vault: { ...prev.vault, semSeason: e.target.value } }))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"><option value="">Any</option><option>Fall</option><option>Summer</option><option>Spring</option></select>
                                     <select value={filters.vault.semYear} onChange={e => setFilters(prev => ({ ...prev, vault: { ...prev.vault, semYear: e.target.value } }))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"><option value="">Year</option>{Array.from({ length: 11 }, (_, i) => 2020 + i).map(y => <option key={y}>{y}</option>)}</select>
                                 </div>
                             </div>
