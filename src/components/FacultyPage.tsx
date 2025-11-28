@@ -9,7 +9,21 @@ export default function FacultyPage() {
 
   const filteredTeachers = teachers.filter((teacher: any) => 
     teacher.name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  ).sort((a: any, b: any) => {
+    const getRank = (designation: string) => {
+      const d = (designation || '').toLowerCase()
+      if (d.includes('chairman') && !d.includes('acting')) return 1
+      if (d.includes('acting chairman')) return 2
+      if (d.includes('professor') && !d.includes('associate') && !d.includes('assistant')) return 3
+      if (d.includes('associate professor')) return 4
+      if (d.includes('assistant professor')) return 5
+      if (d.includes('senior lecturer')) return 6
+      if (d.includes('lecturer')) return 7
+      if (d.includes('coordinator')) return 8
+      return 9
+    }
+    return getRank(a.designation) - getRank(b.designation)
+  })
 
   const getPaperCount = (teacherId: string) => {
     return papers.filter((paper: any) => paper.teacherId === teacherId).length

@@ -25,8 +25,19 @@ export default function TeacherProfilePage() {
   }
 
   const getTeacherHistory = () => {
+    if (!teacher) return []
+    
+    // If manual course history exists, use it
+    if (teacher.courseHistory && teacher.courseHistory.length > 0) {
+      return teacher.courseHistory
+    }
+
+    // Fallback to derived history from papers
     if (!teacherId) return []
-    return papers.filter((paper: any) => paper.teacherId === teacherId)
+    return papers.filter((paper: any) => paper.teacherId === teacherId).map((p: any) => ({
+      ...p,
+      status: 'taken' // Default for derived papers
+    }))
   }
 
   if (!teacher) {
@@ -83,24 +94,38 @@ export default function TeacherProfilePage() {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Semester</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Course</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Status</th>
               </tr>
             </thead>
             <tbody id="tp-history" className="bg-white divide-y divide-gray-200">
-              {teacherHistory.map((paper: any) => (
-                <tr key={paper.id}>
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{paper.semester}</td>
+              {teacherHistory.map((course: any, index: number) => (
+                <tr 
+                  key={course.id || index} 
+                  className={course.status === 'ongoing' ? 'bg-green-50' : ''}
+                >
+                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{course.semester}</td>
                   <td className="px-6 py-4 text-sm text-gray-500">
-                    <span className="font-bold mr-2">{paper.courseCode}</span>
-                    {paper.courseName}
+                    <span className="font-bold mr-2">{course.courseCode}</span>
+                    {course.courseName}
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <button 
-                      onClick={() => window.open(paper.fileUrl, '_blank')}
-                      className="text-indigo-600 hover:underline"
-                    >
-                      View
-                    </button>
+                  <td className="px-6 py-4 text-right text-sm">
+                    {course.status === 'ongoing' ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Ongoing
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        Taken
+                      </span>
+                    )}
+                    {course.fileUrl && (
+                      <button 
+                        onClick={() => window.open(course.fileUrl, '_blank')}
+                        className="ml-3 text-indigo-600 hover:underline text-xs"
+                      >
+                        View Paper
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

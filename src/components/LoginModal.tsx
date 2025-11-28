@@ -13,7 +13,7 @@ export default function LoginModal({ isOpen, onClose, onLogin }: {
     const username = formData.get('username') as string
     const password = formData.get('password') as string
     
-    if (username === 'admin' && password === 'admin') {
+    if (username === 'sub-admin' && password === 'admin2025') {
       onLogin(true)
       onClose()
     } else {

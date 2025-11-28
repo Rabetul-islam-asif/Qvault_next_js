@@ -19,13 +19,13 @@ export const theoryCourses = ['CSE101', 'CSE102', 'MAT101']
 export const labCourses = ['CSE105', 'CSE106']
 
 export const semesters = [
-  'Winter 2025',
+  'Fall 2025',
   'Summer 2025', 
-  'Winter 2024',
-  'Summer 2024'
+  'Spring 2025',
+  'Fall 2024'
 ]
 
 export const years = Array.from({ length: 11 }, (_, i) => 2020 + i)
-export const seasons = ['Winter', 'Summer']
+export const seasons = ['Fall', 'Summer', 'Spring']
 
 export const examTypes = ['Mid', 'Final']

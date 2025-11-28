@@ -1,15 +1,22 @@
 import { create } from 'zustand'
 
-interface Teacher {
+export interface Teacher {
   id: string
   name: string
   dept: string
   designation: string
   img?: string
   bio?: string
+  courseHistory?: {
+    id: string
+    courseCode: string
+    courseName: string
+    semester: string
+    status: 'ongoing' | 'taken'
+  }[]
 }
 
-interface Paper {
+export interface Paper {
   id: string
   courseCode: string
   courseName: string
@@ -22,7 +29,7 @@ interface Paper {
   uploadedAt?: string
 }
 
-interface PendingPaper {
+export interface PendingPaper {
   id: string
   courseCode: string
   courseName: string
@@ -34,7 +41,7 @@ interface PendingPaper {
   fileUrl: string
 }
 
-interface Filters {
+export interface Filters {
   search: string
   dept: string
   season: string

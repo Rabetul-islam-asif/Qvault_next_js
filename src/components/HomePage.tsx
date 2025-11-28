@@ -65,6 +65,12 @@ export default function HomePage() {
                   📄 Browse All
                 </button>
                 <button 
+                  onClick={() => setCurrentView('course-list')}
+                  className="flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 md:py-4 md:text-lg md:px-8 card-hover"
+                >
+                  📚 Course List
+                </button>
+                <button 
                   onClick={() => setCurrentView('faculty')}
                   className="flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 md:py-4 md:text-lg md:px-8 card-hover"
                 >

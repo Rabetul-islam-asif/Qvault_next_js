@@ -10,6 +10,7 @@ import VaultPage from '@/components/VaultPage'
 import FacultyPage from '@/components/FacultyPage'
 import TeacherProfilePage from '@/components/TeacherProfilePage'
 import AdminDashboard from '@/components/AdminDashboard'
+import CourseListPage from '@/components/CourseListPage'
 import UploadModal from '@/components/UploadModal'
 import LoginModal from '@/components/LoginModal'
 import Toast from '@/components/Toast'
@@ -84,7 +85,7 @@ export default function App() {
 
     // Set initial view from URL
     const hash = window.location.hash.slice(1)
-    if (hash && ['home', 'vault', 'faculty', 'teacher-profile', 'admin'].includes(hash)) {
+    if (hash && ['home', 'vault', 'faculty', 'teacher-profile', 'admin', 'course-list'].includes(hash)) {
       setCurrentView(hash)
     }
 
@@ -132,6 +133,8 @@ export default function App() {
         return <FacultyPage />
       case 'teacher-profile':
         return <TeacherProfilePage />
+      case 'course-list':
+        return <CourseListPage />
       case 'admin':
         return user ? <AdminDashboard /> : <HomePage />
       default:

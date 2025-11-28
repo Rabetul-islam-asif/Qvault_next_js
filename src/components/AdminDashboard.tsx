@@ -11,6 +11,7 @@ export default function AdminDashboard() {
   const [paperSearch, setPaperSearch] = useState('')
   const [editingTeacher, setEditingTeacher] = useState<any>(null)
   const [teacherModalOpen, setTeacherModalOpen] = useState(false)
+  const [editingCourses, setEditingCourses] = useState<any[]>([])
 
   const handleLogout = () => {
     setUser(null)
@@ -77,7 +78,8 @@ export default function AdminDashboard() {
       dept: formData.get('dept') as string,
       designation: formData.get('designation') as string,
       img: formData.get('img') as string,
-      bio: formData.get('bio') as string
+      bio: formData.get('bio') as string,
+      courseHistory: editingCourses
     }
 
     try {
@@ -94,7 +96,24 @@ export default function AdminDashboard() {
 
   const openTeacherModal = (teacher?: any) => {
     setEditingTeacher(teacher || null)
+    setEditingCourses(teacher?.courseHistory || [])
     setTeacherModalOpen(true)
+  }
+
+  const addCourse = () => {
+    setEditingCourses([...editingCourses, { id: Date.now().toString(), courseCode: '', courseName: '', semester: '', status: 'taken' }])
+  }
+
+  const removeCourse = (index: number) => {
+    const newCourses = [...editingCourses]
+    newCourses.splice(index, 1)
+    setEditingCourses(newCourses)
+  }
+
+  const updateCourse = (index: number, field: string, value: string) => {
+    const newCourses = [...editingCourses]
+    newCourses[index] = { ...newCourses[index], [field]: value }
+    setEditingCourses(newCourses)
   }
 
   const getTeacherName = (teacherId: string) => {
@@ -283,8 +302,8 @@ export default function AdminDashboard() {
 
       {/* Teacher Modal */}
       {teacherModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg z-10 p-6 m-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl z-10 p-6 m-4 my-8">
             <div className="flex justify-between items-center mb-5">
               <h3 className="text-lg font-bold text-gray-900">Faculty Profile</h3>
               <button onClick={() => setTeacherModalOpen(false)}>
@@ -334,6 +353,63 @@ export default function AdminDashboard() {
                 placeholder="Bio" 
                 className="w-full border-gray-300 rounded-lg border p-2"
               />
+
+              {/* Course History Section */}
+              <div className="border-t pt-4 mt-4">
+                <div className="flex justify-between items-center mb-2">
+                  <h4 className="font-bold text-gray-700">Course History</h4>
+                  <button 
+                    type="button"
+                    onClick={addCourse}
+                    className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded hover:bg-indigo-100"
+                  >
+                    + Add Course
+                  </button>
+                </div>
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                  {editingCourses.map((course, index) => (
+                    <div key={index} className="flex gap-2 items-center bg-gray-50 p-2 rounded">
+                      <input 
+                        value={course.courseCode} 
+                        onChange={(e) => updateCourse(index, 'courseCode', e.target.value)}
+                        placeholder="Code" 
+                        className="w-20 text-xs border rounded p-1"
+                      />
+                      <input 
+                        value={course.courseName} 
+                        onChange={(e) => updateCourse(index, 'courseName', e.target.value)}
+                        placeholder="Course Name" 
+                        className="flex-1 text-xs border rounded p-1"
+                      />
+                      <input 
+                        value={course.semester} 
+                        onChange={(e) => updateCourse(index, 'semester', e.target.value)}
+                        placeholder="Sem" 
+                        className="w-24 text-xs border rounded p-1"
+                      />
+                      <select 
+                        value={course.status} 
+                        onChange={(e) => updateCourse(index, 'status', e.target.value)}
+                        className="text-xs border rounded p-1"
+                      >
+                        <option value="taken">Taken</option>
+                        <option value="ongoing">Ongoing</option>
+                      </select>
+                      <button 
+                        type="button" 
+                        onClick={() => removeCourse(index)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <i className="fas fa-trash"></i>
+                      </button>
+                    </div>
+                  ))}
+                  {editingCourses.length === 0 && (
+                    <p className="text-xs text-gray-400 text-center italic">No course history added.</p>
+                  )}
+                </div>
+              </div>
+
               <div className="flex justify-end pt-2">
                 <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 shadow">
                   Save Changes
