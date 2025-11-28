@@ -339,9 +339,19 @@ export default function QVaultApp() {
     const saveTeacher = async () => {
         if (!supabase) return;
         const { id, ...data } = teacherForm;
-        if (id) await supabase.from('teachers').update(data).eq('id', id);
-        else await supabase.from('teachers').insert(data);
+        
+        const { error } = id 
+            ? await supabase.from('teachers').update(data).eq('id', id)
+            : await supabase.from('teachers').insert(data);
+
+        if (error) {
+            console.error('Error saving teacher:', error);
+            alert('Failed to save profile: ' + error.message);
+            return;
+        }
+
         setShowTeacherModal(false);
+        window.location.reload(); // Refresh to show changes
     };
 
     // --- RENDERERS ---
