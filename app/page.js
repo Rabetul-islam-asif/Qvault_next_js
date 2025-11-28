@@ -9,62 +9,62 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 // --- COURSE DATABASE ---
 const COURSE_DB = [
-    { code: "ORE 101", name: "Freshman Orientation", type: "theory" },
-    { code: "ENG 100", name: "English Fundamentals", type: "theory" },
-    { code: "CSE 123", name: "Structured Programming Language", type: "theory" },
-    { code: "CSE 124", name: "Structured Programming Language Sessional", type: "lab" },
-    { code: "PHY 217", name: "Physics", type: "theory" },
-    { code: "EEE 193", name: "Electrical Circuit and Devices", type: "theory" },
-    { code: "MAT 113", name: "Differential and Integral Calculus", type: "theory" },
-    { code: "CSE 115", name: "Computer Applications and Future Aspects", type: "theory" },
-    { code: "ENG 117", name: "Composition", type: "theory" },
-    { code: "MAT 135", name: "Discrete Mathematics", type: "theory" },
-    { code: "EEE 195", name: "Electronics", type: "theory" },
-    { code: "EEE 196", name: "Electronics Sessional", type: "lab" },
-    { code: "CSE 133", name: "Digital Logic Design", type: "theory" },
-    { code: "CSE 134", name: "Digital Logic Design Sessional", type: "lab" },
-    { code: "CSE 121", name: "Data Structures and Algorithms I", type: "theory" },
-    { code: "CSE 122", name: "Data Structure and Algorithms I Sessional", type: "lab" },
-    { code: "SOC 113", name: "Bangladesh Studies", type: "theory" },
-    { code: "ACC 227", name: "Financial, Cost, and Managerial Accounting", type: "theory" },
-    { code: "MAT 225", name: "Coordinate Geometry and Vector Calculus", type: "theory" },
-    { code: "CSE 213", name: "Digital Electronics and Pulse Technique", type: "theory" },
-    { code: "CSE 214", name: "Digital Electronics and Pulse Technique Sessional", type: "lab" },
-    { code: "CSE 217", name: "Object Oriented Programming", type: "theory" },
-    { code: "CSE 218", name: "Object Oriented Programming Sessional", type: "lab" },
-    { code: "HUM 319", name: "Engineering Economics", type: "theory" },
-    { code: "MAT 319", name: "Linear Algebra, Fourier Analysis and Laplace Transformation", type: "theory" },
-    { code: "MAT 237", name: "Statistics and Probability", type: "theory" },
-    { code: "CSE 233", name: "Computer Organization and Architecture", type: "theory" },
-    { code: "CSE 234", name: "Computer Organization and Architecture Sessional", type: "lab" },
-    { code: "CSE 231", name: "Data Structures and Algorithms II", type: "theory" },
-    { code: "CSE 232", name: "Data Structures and Algorithms II Sessional", type: "lab" },
-    { code: "CSE 223", name: "Database Management System", type: "theory" },
-    { code: "CSE 224", name: "Database Management System Sessional", type: "lab" },
-    { code: "CSE 335", name: "Data Communication", type: "theory" },
-    { code: "MAT 327", name: "Numerical Methods", type: "theory" },
-    { code: "CSE 327", name: "Microprocessors, Microcontrollers and Embedded Systems", type: "theory" },
-    { code: "CSE 328", name: "Microprocessors, Microcontrollers, and Embedded Systems Sessional", type: "lab" },
-    { code: "CSE 313", name: "Operating System", type: "theory" },
-    { code: "CSE 314", name: "Operating System Sessional", type: "lab" },
-    { code: "CSE 333", name: "Advanced Programming", type: "theory" },
-    { code: "CSE 334", name: "Advanced Programming Sessional", type: "lab" },
-    { code: "CSE 339", name: "Industrial and Operational Management", type: "theory" },
-    { code: "HUM 311", name: "Engineering Ethics and Professional Practice", type: "theory" },
-    { code: "MAT 337", name: "Mathematical Analysis for Computer Science", type: "theory" },
-    { code: "CSE 320", name: "Technical Writing and Research Methodology", type: "theory" },
-    { code: "CSE 315", name: "Computer Network", type: "theory" },
-    { code: "CSE 316", name: "Computer Network Sessional", type: "lab" },
-    { code: "CSE 321", name: "Artificial Intelligence and Expert System", type: "theory" },
-    { code: "CSE 322", name: "Artificial Intelligence and Expert System Sessional", type: "lab" },
-    { code: "CSE 400", name: "Project and Thesis", type: "theory" },
-    { code: "CSE 431", name: "System Design and Software Engineering", type: "theory" },
-    { code: "CSE 432", name: "System Design and Software Engineering Sessional", type: "lab" },
-    { code: "CSE 411", name: "Automata Theory and Compiler", type: "theory" },
-    { code: "CSE 412", name: "Automata Theory and Compiler Sessional", type: "lab" },
-    { code: "CSE 413", name: "Computer Graphics", type: "theory" },
-    { code: "CSE 414", name: "Computer Graphics Sessional", type: "lab" },
-    { code: "CSE 441", name: "Computer and Cyber Security", type: "theory" }
+    { code: "10031CSE320", name: "Technical Writing and Research Methodology", credits: 3, type: "theory" },
+    { code: "20031ORE101", name: "Freshman Orientation", credits: 0.5, type: "theory" },
+    { code: "300611CSE233", name: "Computer Organization and Architecture", credits: 3, pre: "0611CSE133", type: "theory" },
+    { code: "300611CSE234", name: "Computer Organization and Architecture Sessional", credits: 1.5, pre: "0611CSE133", type: "lab" },
+    { code: "300611CSE313", name: "Operating System", credits: 3, pre: "0611CSE233", type: "theory" },
+    { code: "300611CSE314", name: "Operating System Sessional", credits: 1.5, pre: "0611CSE233", type: "lab" },
+    { code: "300611CSE315", name: "Computer Network", credits: 3, pre: "0611CSE335", type: "theory" },
+    { code: "300611CSE316", name: "Computer Network Sessional", credits: 1.5, pre: "0611CSE335", type: "lab" },
+    { code: "300611CSE321", name: "Artificial Intelligence and Expert System", credits: 3, pre: "0611CSE121", type: "theory" },
+    { code: "300611CSE322", name: "Artificial Intelligence and Expert System Sessional", credits: 1.5, pre: "0611CSE121", type: "lab" },
+    { code: "300611CSE327", name: "Microprocessors, Microcontrollers and Embedded Systems", credits: 3, pre: "0611CSE233", type: "theory" },
+    { code: "300611CSE328", name: "Microprocessors, Microcontrollers, and Embedded Systems Sessional", credits: 1.5, pre: "0611CSE233", type: "lab" },
+    { code: "300611CSE333", name: "Advanced Programming", credits: 3, pre: "0611CSE217", type: "theory" },
+    { code: "300611CSE334", name: "Advanced Programming Sessional", credits: 1.5, pre: "0611CSE217", type: "lab" },
+    { code: "300611CSE335", name: "Data Communication", credits: 3, pre: "0611CSE233", type: "theory" },
+    { code: "300611CSE339", name: "Industrial and Operational Management", credits: 3, type: "theory" },
+    { code: "300611CSE400", name: "Project and Thesis", credits: 3, type: "theory" },
+    { code: "300611CSE411", name: "Automata Theory and Compiler", credits: 3, pre: "0611CSE121", type: "theory" },
+    { code: "300611CSE412", name: "Automata Theory and Compiler Sessional", credits: 1.5, pre: "0611CSE121", type: "lab" },
+    { code: "300611CSE413", name: "Computer Graphics", credits: 3, pre: "0611CSE231", type: "theory" },
+    { code: "300611CSE414", name: "Computer Graphics Sessional", credits: 1.5, pre: "0611CSE231", type: "lab" },
+    { code: "300611CSE431", name: "System Design and Software Engineering", credits: 3, pre: "0611CSE223", type: "theory" },
+    { code: "300611CSE432", name: "System Design and Software Engineering Sessional", credits: 1.5, pre: "0611CSE223", type: "lab" },
+    { code: "300611CSE441", name: "Computer and Cyber Security", credits: 3, pre: "0611CSE315", type: "theory" },
+    { code: "300611HUM311", name: "Engineering Ethics and Professional Practice", credits: 3, type: "theory" },
+    { code: "300611HUM319", name: "Engineering Economics", credits: 3.0, type: "theory" },
+    { code: "300611MAT319", name: "Linear Algebra, Fourier Analysis and Laplace Transformation", credits: 3, pre: "0611MAT113", type: "theory" },
+    { code: "300611MAT327", name: "Numerical Methods", credits: 3, pre: "0611MAT113", type: "theory" },
+    { code: "300611MAT337", name: "Mathematical Analysis for Computer Science", credits: 3, pre: "0611MAT113", type: "theory" },
+    { code: "300613ACC227", name: "Financial, Cost, and Managerial Accounting", credits: 3, type: "theory" },
+    { code: "300613CSE213", name: "Digital Electronics and Pulse Technique", credits: 3, pre: "0611EEE195", type: "theory" },
+    { code: "300613CSE214", name: "Digital Electronics and Pulse Technique Sessional", credits: 1.5, pre: "0611EEE195", type: "lab" },
+    { code: "300613CSE217", name: "Object Oriented Programming", credits: 3, pre: "0611CSE123", type: "theory" },
+    { code: "300613CSE218", name: "Object Oriented Programming Sessional", credits: 1.5, pre: "0611CSE123", type: "lab" },
+    { code: "300613CSE223", name: "Database Management System", credits: 3, pre: "0611CSE121", type: "theory" },
+    { code: "300613CSE224", name: "Database Management System Sessional", credits: 1.5, pre: "0611CSE121", type: "lab" },
+    { code: "300613CSE231", name: "Data Structures and Algorithms II", credits: 3, pre: "0611CSE121", type: "theory" },
+    { code: "300613CSE232", name: "Data Structures and Algorithms II Sessional", credits: 1.5, pre: "0611CSE121", type: "lab" },
+    { code: "300613MAT225", name: "Coordinate Geometry and Vector Calculus", credits: 3, pre: "0611MAT113", type: "theory" },
+    { code: "300613MAT237", name: "Statistics and Probability", credits: 3, pre: "0611MAT113", type: "theory" },
+    { code: "300615CSE121", name: "Data Structures and Algorithms I", credits: 3, pre: "0611CSE123", type: "theory" },
+    { code: "300615CSE122", name: "Data Structure and Algorithms I Sessional", credits: 1.5, pre: "0611CSE123", type: "lab" },
+    { code: "300615CSE133", name: "Digital Logic Design", credits: 3, type: "theory" },
+    { code: "300615CSE134", name: "Digital Logic Design Sessional", credits: 1.5, type: "lab" },
+    { code: "300615EEE195", name: "Electronics", credits: 3, pre: "0611EEE193", type: "theory" },
+    { code: "300615EEE196", name: "Electronics Sessional", credits: 1.5, pre: "0611EEE193", type: "lab" },
+    { code: "300615MAT135", name: "Discrete Mathematics", credits: 3, type: "theory" },
+    { code: "300615SOC113", name: "Bangladesh Studies", credits: 3, type: "theory" },
+    { code: "300617CSE115", name: "Computer Applications and Future Aspects", credits: 3, type: "theory" },
+    { code: "300617CSE123", name: "Structured Programming Language", credits: 3, type: "theory" },
+    { code: "300617CSE124", name: "Structured Programming Language Sessional", credits: 1.5, type: "lab" },
+    { code: "300617EEE193", name: "Electrical Circuit and Devices", credits: 3, pre: "0611PHY217", type: "theory" },
+    { code: "300617ENG117", name: "Composition", credits: 3, pre: "0611ENG100", type: "theory" },
+    { code: "300617MAT113", name: "Differential and Integral Calculus", credits: 3, type: "theory" },
+    { code: "300617PHY217", name: "Physics", credits: 3, type: "theory" },
+    { code: "300619ENG100", name: "English Fundamentals", credits: 3, type: "theory" }
 ];
 
 const DEPARTMENTS = [
@@ -97,6 +97,9 @@ export default function QVaultApp() {
     const [teacherProfileId, setTeacherProfileId] = useState(null);
     const [adminTab, setAdminTab] = useState('uploads');
     
+    // New State for Course List
+    const [courseListDept, setCourseListDept] = useState('Computer Science & Engineering');
+
     // Upload Form State
     const [uploadType, setUploadType] = useState('paper'); // 'paper' or 'material'
     const [uploadFormData, setUploadFormData] = useState({
@@ -279,7 +282,7 @@ export default function QVaultApp() {
         e.preventDefault();
         const id = e.target.elements.id.value;
         const pass = e.target.elements.pass.value;
-        if (id === 'admin' && pass === 'admin') {
+        if (id === 'sub=admin' && pass === 'admin2025') {
             setUser('admin');
             setShowLoginModal(false);
             setView('admin');
@@ -409,6 +412,7 @@ export default function QVaultApp() {
                                         <p className="mt-4 text-base text-slate-500 sm:mt-5 sm:text-lg md:mt-5 md:text-xl leading-relaxed">Access a curated archive of past papers, slides, and class notes instantly.</p>
                                         <div className="mt-8 flex gap-3 flex-wrap justify-center lg:justify-start">
                                             <button onClick={() => setView('vault')} className="px-5 py-2.5 rounded-xl font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-colors text-sm">Question Bank</button>
+                                            <button onClick={() => setView('course-list')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Course List</button>
                                             <button onClick={() => setView('materials')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Materials</button>
                                             <button onClick={() => setView('faculty')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Faculty</button>
                                         </div>
@@ -545,6 +549,45 @@ export default function QVaultApp() {
                     </div>
                 )}
 
+                {/* COURSE LIST VIEW */}
+                {view === 'course-list' && (
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+                        <div className="text-center mb-16">
+                            <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">Course List</h2>
+                            <p className="mt-4 max-w-2xl mx-auto text-lg text-slate-500">Browse courses by department.</p>
+                            <div className="mt-8 max-w-md mx-auto">
+                                <select value={courseListDept} onChange={(e) => setCourseListDept(e.target.value)} className="block w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none shadow-sm">
+                                    {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {(() => {
+                                const staticCourses = courseListDept === 'Computer Science & Engineering' ? COURSE_DB : [];
+                                const dynamicCourses = [...new Set(papers.filter(p => p.dept === courseListDept).map(p => JSON.stringify({ code: p.courseCode, name: p.courseName })))].map(s => JSON.parse(s));
+                                const allCourses = [...staticCourses, ...dynamicCourses].filter((v,i,a)=>a.findIndex(t=>(t.code === v.code))===i).sort((a,b) => a.code.localeCompare(b.code));
+
+                                return allCourses.map((c, i) => (
+                                    <div key={i} onClick={() => { setFilters(prev => ({ ...prev, vault: { ...prev.vault, search: c.code } })); setView('vault'); }} className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between">
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{c.code}</span>
+                                                <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{c.credits ? `${c.credits} Cr` : 'N/A'}</span>
+                                            </div>
+                                            <h3 className="font-bold text-slate-800 mb-2">{c.name}</h3>
+                                        </div>
+                                        {c.pre && (
+                                            <div className="mt-2 pt-2 border-t border-slate-50">
+                                                <p className="text-xs text-slate-500"><span className="font-bold text-slate-400 uppercase">Pre-req:</span> {c.pre}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                ));
+                            })()}
+                        </div>
+                    </div>
+                )}
+
                 {/* FACULTY VIEW */}
                 {view === 'faculty' && (
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -560,7 +603,22 @@ export default function QVaultApp() {
                             </div>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                            {teachers.filter(t => t.name.toLowerCase().includes(filters.faculty.search.toLowerCase())).map(t => (
+                            {teachers.filter(t => t.name.toLowerCase().includes(filters.faculty.search.toLowerCase()))
+                            .sort((a, b) => {
+                                const designationRank = {
+                                    "Chairman": 1,
+                                    "Acting Chairman": 2,
+                                    "Professor": 3,
+                                    "Course Coordinator (NS)": 4,
+                                    "Academic Advisor": 5,
+                                    "Assistant Professor": 6,
+                                    "Senior Lecturer": 7,
+                                    "Lecturer": 8,
+                                    "Coordinator": 9
+                                };
+                                return (designationRank[a.designation] || 99) - (designationRank[b.designation] || 99);
+                            })
+                            .map(t => (
                                 <div key={t.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 flex flex-col items-center text-center hover:translate-y-[-4px] transition-all duration-300 cursor-pointer group" onClick={() => { setTeacherProfileId(t.id); setView('teacher-profile'); }}>
                                     <div className="relative w-28 h-28 mb-5">
                                         <div className="absolute inset-0 bg-indigo-100 rounded-full blur-lg opacity-50 group-hover:opacity-75 transition-opacity"></div>
@@ -582,7 +640,10 @@ export default function QVaultApp() {
                         {(() => {
                             const t = teachers.find(x => x.id == teacherProfileId);
                             if (!t) return null;
-                            const hist = papers.filter(p => p.teacherId == teacherProfileId);
+                            const manualCourses = t.courses ? t.courses : [];
+                            const paperCourses = [...new Set(papers.filter(p => p.teacherId == teacherProfileId).map(p => JSON.stringify({ code: p.courseCode, name: p.courseName, semester: p.semester })))].map(s => JSON.parse(s));
+                            const coursesToDisplay = manualCourses.length > 0 ? manualCourses : paperCourses;
+
                             return (
                                 <>
                                     <button onClick={() => setView('faculty')} className="mb-6 flex items-center text-slate-500 hover:text-indigo-600 font-medium transition-colors"><i className="fas fa-arrow-left mr-2"></i> Back to list</button>
@@ -620,17 +681,21 @@ export default function QVaultApp() {
                                                     </tr>
                                                 </thead>
                                                 <tbody className="bg-white divide-y divide-slate-100">
-                                                    {hist.map(p => (
-                                                        <tr key={p.id}>
-                                                            <td className="px-8 py-4 text-sm font-medium text-slate-900">{p.semester}</td>
-                                                            <td className="px-8 py-4 text-sm text-slate-500"><span className="font-bold mr-2 text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{p.courseCode}</span>{p.courseName}</td>
-                                                            <td className="px-8 py-4 text-right"><button onClick={() => { setPreviewUrl(p.fileUrl); setShowPreviewModal(true); }} className="text-indigo-600 hover:text-indigo-800 font-semibold hover:underline">View PDF</button></td>
+                                                    {coursesToDisplay.map((p, i) => (
+                                                        <tr key={i}>
+                                                            <td className="px-8 py-4 text-sm font-medium text-slate-900">{p.semester || (p.ongoing ? <span className="text-green-600 bg-green-50 px-2 py-0.5 rounded text-xs uppercase font-bold">Ongoing</span> : 'Past')}</td>
+                                                            <td className="px-8 py-4 text-sm text-slate-500"><span className="font-bold mr-2 text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{p.code || p.courseCode}</span>{p.name || p.courseName}</td>
+                                                            <td className="px-8 py-4 text-right">
+                                                                {p.fileUrl ? (
+                                                                    <button onClick={() => { setPreviewUrl(p.fileUrl); setShowPreviewModal(true); }} className="text-indigo-600 hover:text-indigo-800 font-semibold hover:underline">View PDF</button>
+                                                                ) : <span className="text-slate-400 text-xs">No File</span>}
+                                                            </td>
                                                         </tr>
                                                     ))}
                                                 </tbody>
                                             </table>
                                         </div>
-                                        {hist.length === 0 && <div className="px-6 py-12 text-center text-slate-400"><p>No records found for this faculty member.</p></div>}
+                                        {coursesToDisplay.length === 0 && <div className="px-6 py-12 text-center text-slate-400"><p>No records found for this faculty member.</p></div>}
                                     </div>
                                 </>
                             );
