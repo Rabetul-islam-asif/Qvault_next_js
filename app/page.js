@@ -763,77 +763,145 @@ export default function QVaultApp() {
 
                 {/* ADMIN DASHBOARD */}
                 {view === 'admin' && (
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 h-full flex flex-col">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 min-h-full flex flex-col">
                         <div className="flex justify-between items-center mb-8">
                             <div><h2 className="text-3xl font-extrabold text-slate-900">Admin Dashboard</h2><p className="text-slate-500 mt-1">Manage content and faculty.</p></div>
-                            <button onClick={() => { setUser(null); setView('home'); }} className="text-red-500 hover:text-red-700 font-bold text-sm bg-red-50 px-4 py-2 rounded-xl transition-colors">Logout</button>
+                            <div className="flex gap-3">
+                                <button onClick={() => setView('home')} className="text-indigo-600 hover:text-indigo-800 font-bold text-sm bg-indigo-50 px-4 py-2 rounded-xl transition-colors">Home</button>
+                                <button onClick={() => { setUser(null); setView('home'); }} className="text-red-500 hover:text-red-700 font-bold text-sm bg-red-50 px-4 py-2 rounded-xl transition-colors">Logout</button>
+                            </div>
                         </div>
                         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden flex flex-col flex-1">
-                            <div className="flex border-b border-slate-200">
-                                {['uploads', 'faculty'].map(tab => (
-                                    <button key={tab} onClick={() => setAdminTab(tab)} className={`flex-1 py-4 text-sm font-bold uppercase tracking-wide transition-all ${adminTab === tab ? 'bg-indigo-50 text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>{tab}</button>
-                                ))}
+                            <div className="flex border-b border-slate-200 overflow-x-auto">
+                                {['uploads', 'mat_uploads', 'papers', 'materials', 'faculty'].map(tab => {
+                                    const names = { uploads: 'Pending Questions', mat_uploads: 'Pending Materials', papers: 'Questions', materials: 'Materials', faculty: 'Faculty' };
+                                    return (
+                                        <button key={tab} onClick={() => setAdminTab(tab)} className={`flex-1 py-4 text-sm font-bold uppercase tracking-wide transition-all whitespace-nowrap px-4 ${adminTab === tab ? 'bg-indigo-50 text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>{names[tab]}</button>
+                                    );
+                                })}
                             </div>
+
+                            {/* UPLOADS TAB (Pending Papers) */}
                             {adminTab === 'uploads' && (
                                 <div className="flex-1 overflow-y-auto p-6">
-                                    <div className="space-y-8">
-                                        <div>
-                                            <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><i className="fas fa-clock text-amber-500"></i> Pending Approvals</h3>
-                                            {pendingPapers.length === 0 && pendingMaterials.length === 0 ? (
-                                                <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-400 text-sm">No pending items.</div>
-                                            ) : (
-                                                <div className="space-y-3">
-                                                    {[...pendingPapers.map(p => ({...p, _type: 'paper'})), ...pendingMaterials.map(m => ({...m, _type: 'material'}))].map(item => (
-                                                        <div key={item.id} className="flex items-center justify-between p-4 bg-amber-50 border border-amber-100 rounded-xl">
-                                                            <div>
-                                                                <div className="font-bold text-slate-800 text-sm"><span className="uppercase text-[10px] bg-white border border-amber-200 px-1.5 py-0.5 rounded text-amber-600 mr-2 font-extrabold tracking-wider">{item._type}</span> {item.courseName}</div>
-                                                                <div className="text-xs text-slate-500 mt-1">{item.courseCode} • {item.semester} • {getTeacherName(item.teacherId)}</div>
-                                                                <a href={item.fileUrl} target="_blank" className="text-xs text-indigo-600 hover:underline mt-1 block">View File</a>
-                                                            </div>
-                                                            <div className="flex gap-2">
-                                                                <button onClick={() => approveItem(item, item._type)} className="bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-600 shadow-sm">Approve</button>
-                                                                <button onClick={() => rejectItem(item.id, item._type)} className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-600 shadow-sm">Reject</button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
+                                    <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><i className="fas fa-clock text-amber-500"></i> Pending Question Approvals</h3>
+                                    {pendingPapers.length === 0 ? (
+                                        <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-400 text-sm">No pending papers.</div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {pendingPapers.map(p => ({...p, _type: 'paper'})).map(item => (
+                                                <div key={item.id} className="flex items-center justify-between p-4 bg-amber-50 border border-amber-100 rounded-xl">
+                                                    <div>
+                                                        <div className="font-bold text-slate-800 text-sm"><span className="uppercase text-[10px] bg-white border border-amber-200 px-1.5 py-0.5 rounded text-amber-600 mr-2 font-extrabold tracking-wider">PAPER</span> {item.courseName}</div>
+                                                        <div className="text-xs text-slate-500 mt-1">{item.courseCode} • {item.semester} • {getTeacherName(item.teacherId)}</div>
+                                                        <a href={item.fileUrl} target="_blank" className="text-xs text-indigo-600 hover:underline mt-1 block">View File</a>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => approveItem(item, 'paper')} className="bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-600 shadow-sm">Approve</button>
+                                                        <button onClick={() => rejectItem(item.id, 'paper')} className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-600 shadow-sm">Reject</button>
+                                                    </div>
                                                 </div>
-                                            )}
+                                            ))}
                                         </div>
-                                        
-                                        <div>
-                                            <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><i className="fas fa-database text-indigo-500"></i> Database Content</h3>
-                                            <div className="flex gap-4 mb-4">
-                                                <input placeholder="Search database..." className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none" onChange={e => setFilters(prev => ({ ...prev, adminPaper: { search: e.target.value } }))} />
-                                            </div>
-                                            <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
-                                                <table className="min-w-full divide-y divide-slate-200">
-                                                    <thead className="bg-slate-100">
-                                                        <tr>
-                                                            <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Course</th>
-                                                            <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Type</th>
-                                                            <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Action</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="bg-white divide-y divide-slate-100">
-                                                        {[...papers.map(p => ({...p, _type: 'paper'})), ...materials.map(m => ({...m, _type: 'material'}))]
-                                                        .filter(i => i.courseName.toLowerCase().includes(filters.adminPaper.search.toLowerCase()) || i.courseCode.toLowerCase().includes(filters.adminPaper.search.toLowerCase()))
-                                                        .slice(0, 50)
-                                                        .map(item => (
-                                                            <tr key={item.id} className="hover:bg-slate-50">
-                                                                <td className="px-6 py-4 whitespace-nowrap"><div className="text-sm font-bold text-slate-900">{item.courseCode}</div><div className="text-xs text-slate-500 truncate max-w-xs">{item.courseName}</div></td>
-                                                                <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2 py-1 inline-flex text-[10px] leading-5 font-bold rounded-full ${item._type === 'paper' ? 'bg-indigo-100 text-indigo-800' : 'bg-purple-100 text-purple-800'} uppercase`}>{item._type}</span></td>
-                                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"><button onClick={() => deleteItem(item.id, item._type === 'paper' ? 'papers' : 'materials')} className="text-red-400 hover:text-red-600"><i className="fas fa-trash-alt"></i></button></td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* MAT_UPLOADS TAB (Pending Materials) */}
+                            {adminTab === 'mat_uploads' && (
+                                <div className="flex-1 overflow-y-auto p-6">
+                                    <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><i className="fas fa-clock text-amber-500"></i> Pending Material Approvals</h3>
+                                    {pendingMaterials.length === 0 ? (
+                                        <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-400 text-sm">No pending materials.</div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {pendingMaterials.map(m => ({...m, _type: 'material'})).map(item => (
+                                                <div key={item.id} className="flex items-center justify-between p-4 bg-amber-50 border border-amber-100 rounded-xl">
+                                                    <div>
+                                                        <div className="font-bold text-slate-800 text-sm"><span className="uppercase text-[10px] bg-white border border-amber-200 px-1.5 py-0.5 rounded text-amber-600 mr-2 font-extrabold tracking-wider">MATERIAL</span> {item.courseName}</div>
+                                                        <div className="text-xs text-slate-500 mt-1">{item.courseCode} • {item.semester} • {getTeacherName(item.teacherId)}</div>
+                                                        <a href={item.fileUrl} target="_blank" className="text-xs text-indigo-600 hover:underline mt-1 block">View File</a>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => approveItem(item, 'material')} className="bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-600 shadow-sm">Approve</button>
+                                                        <button onClick={() => rejectItem(item.id, 'material')} className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-600 shadow-sm">Reject</button>
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* PAPERS TAB */}
+                            {adminTab === 'papers' && (
+                                <div className="flex-1 overflow-y-auto p-6">
+                                    <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><i className="fas fa-database text-indigo-500"></i> Manage Questions</h3>
+                                    <div className="flex gap-4 mb-4">
+                                        <input placeholder="Search papers..." value={filters.adminPaper.search} className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none" onChange={e => setFilters(prev => ({ ...prev, adminPaper: { search: e.target.value } }))} />
+                                    </div>
+                                    <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                                        <table className="min-w-full divide-y divide-slate-200">
+                                            <thead className="bg-slate-100">
+                                                <tr>
+                                                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Course</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Semester</th>
+                                                    <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-white divide-y divide-slate-100">
+                                                {papers
+                                                .filter(i => i.courseName.toLowerCase().includes(filters.adminPaper.search.toLowerCase()) || i.courseCode.toLowerCase().includes(filters.adminPaper.search.toLowerCase()))
+                                                .slice(0, 50)
+                                                .map(item => (
+                                                    <tr key={item.id} className="hover:bg-slate-50">
+                                                        <td className="px-6 py-4 whitespace-nowrap"><div className="text-sm font-bold text-slate-900">{item.courseCode}</div><div className="text-xs text-slate-500 truncate max-w-xs">{item.courseName}</div></td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{item.semester}</td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"><button onClick={() => deleteItem(item.id, 'papers')} className="text-red-400 hover:text-red-600"><i className="fas fa-trash-alt"></i></button></td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
                             )}
+
+                            {/* MATERIALS TAB */}
+                            {adminTab === 'materials' && (
+                                <div className="flex-1 overflow-y-auto p-6">
+                                    <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><i className="fas fa-database text-indigo-500"></i> Manage Materials</h3>
+                                    <div className="flex gap-4 mb-4">
+                                        <input placeholder="Search materials..." value={filters.adminMaterial.search} className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none" onChange={e => setFilters(prev => ({ ...prev, adminMaterial: { search: e.target.value } }))} />
+                                    </div>
+                                    <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                                        <table className="min-w-full divide-y divide-slate-200">
+                                            <thead className="bg-slate-100">
+                                                <tr>
+                                                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Course</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Type</th>
+                                                    <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-white divide-y divide-slate-100">
+                                                {materials
+                                                .filter(i => i.courseName.toLowerCase().includes(filters.adminMaterial.search.toLowerCase()) || i.courseCode.toLowerCase().includes(filters.adminMaterial.search.toLowerCase()))
+                                                .slice(0, 50)
+                                                .map(item => (
+                                                    <tr key={item.id} className="hover:bg-slate-50">
+                                                        <td className="px-6 py-4 whitespace-nowrap"><div className="text-sm font-bold text-slate-900">{item.courseCode}</div><div className="text-xs text-slate-500 truncate max-w-xs">{item.courseName}</div></td>
+                                                        <td className="px-6 py-4 whitespace-nowrap"><span className="px-2 py-1 inline-flex text-[10px] leading-5 font-bold rounded-full bg-purple-100 text-purple-800 uppercase">{item.type}</span></td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"><button onClick={() => deleteItem(item.id, 'materials')} className="text-red-400 hover:text-red-600"><i className="fas fa-trash-alt"></i></button></td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* FACULTY TAB */}
                             {adminTab === 'faculty' && (
-                                <div>
+                                <div className="flex-1 overflow-y-auto">
                                     <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                                         <h3 className="font-bold text-slate-700">Faculty Members</h3>
                                         <button onClick={() => { setTeacherForm({ id: '', name: '', dept: DEPARTMENTS[10], desig: '', bio: '', img: '', courses: [] }); setShowTeacherModal(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 transition-all">Add New</button>
@@ -1078,7 +1146,8 @@ export default function QVaultApp() {
                             </div>
                         </div>
 
-                        <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end">
+                        <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+                            <button onClick={() => setShowTeacherModal(false)} className="px-6 py-2.5 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-200 transition-colors">Cancel</button>
                             <button onClick={saveTeacher} className="bg-indigo-600 text-white px-8 py-2.5 rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 transition-all">Save Profile</button>
                         </div>
                     </div>
