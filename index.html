@@ -782,11 +782,7 @@
                 window.addEventListener('appinstalled', (evt) => {
                     this.isInstalled = true;
                     this.hideInstallPrompt();
-                    app.toast('Success', 'QVault installed successfully!', 'success');
                 });
-                
-                // Register service worker for offline functionality
-                if ('serviceWorker' in navigator) {
                     window.addEventListener('load', () => {
                         navigator.serviceWorker.register('/sw.js')
                             .then((registration) => {
@@ -832,8 +828,8 @@
         };
 
         // --- SUPABASE CONFIGURATION ---
-        const SUPABASE_URL = "https://imeykplylnqymupmofcb.supabase.co";
-        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImltZXlrcGx5bG5xeW11cG1vZmNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4OTU1NzgsImV4cCI6MjA3OTQ3MTU3OH0.YjkgJ1eWVoM4PCP9bq8qMYKmdrqiwi2JBxk2l1woYZ4";
+        const SUPABASE_URL = "https://nfahvsssiokaprylfrxv.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mYWh2c3NzaW9rYXByeWxmcnh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzNDg2MDEsImV4cCI6MjA3OTkyNDYwMX0.yiq_rqI7_EDNX3eAnK50pgafFjZICoCrhnf8IStwpKs";
         
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -847,12 +843,20 @@
                 user: null, 
                 filters: { search: '', dept: '', semSeason: '', semYear: '', type: '' }
             },
-
             init: function() {
                 // Initialize PWA
                 pwa.init();
                 
                 window.onpopstate = (event) => {
+                    // Check for general modals
+                    const modals = ['modal-upload', 'modal-preview', 'modal-teacher', 'modal-login'];
+                    const openModal = modals.find(id => !document.getElementById(id).classList.contains('hidden'));
+                    
+                    if (openModal) {
+                        app.closeModal(openModal, true); // true = from browser back
+                        return;
+                    }
+
                     // Check if any filter modal is currently visible
                     const vaultOpen = !document.getElementById('modal-filter-vault').classList.contains('hidden');
                     const matOpen = !document.getElementById('modal-filter-materials').classList.contains('hidden');
@@ -1306,77 +1310,6 @@
                 const id = document.getElementById('edit-tid').value;
                 const data = { name: document.getElementById('edit-name').value, dept: document.getElementById('edit-dept').value, designation: document.getElementById('edit-desig').value, img: document.getElementById('edit-img').value, bio: document.getElementById('edit-bio').value };
                 if(id) await supabase.from('teachers').update(data).eq('id', id); else await supabase.from('teachers').insert(data);
-                this.closeModal('modal-teacher');
-            },
-            deleteTeacher: async function(id) { if(confirm('Delete this faculty member?')) await supabase.from('teachers').delete().eq('id', id); },
-
-            // --- HELPERS (Logic Unchanged) ---
-            navigate: function(v, push = true) {
-                if(v==='admin' && !this.state.user) return document.getElementById('modal-login').classList.remove('hidden');
-                
-                document.querySelectorAll('.page-view').forEach(e=>e.classList.remove('active')); 
-                document.getElementById(v+'-view').classList.add('active');
-                
-                if(push) window.history.pushState({ view: v }, '', '#' + v);
-            },
-            openProfile: function(id) {
-                const t = this.state.teachers.find(x => x.id == id); if(!t) return;
-                document.getElementById('tp-name').innerText = t.name; document.getElementById('tp-desig').innerText = t.designation; document.getElementById('tp-dept').innerText = t.dept; document.getElementById('tp-bio').innerText = t.bio; document.getElementById('tp-img').src = t.img || 'https://via.placeholder.com/150';
-                
-                const hist = this.state.papers.filter(p => p.teacherId == id);
-                document.getElementById('tp-history').innerHTML = hist.map(p => `<tr><td class="px-8 py-4 text-sm font-medium text-slate-900">${p.semester}</td><td class="px-8 py-4 text-sm text-slate-500"><span class="font-bold mr-2 text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">${p.courseCode}</span>${p.courseName}</td><td class="px-8 py-4 text-right"><button onclick="app.preview('${p.id}', 'paper')" class="text-indigo-600 hover:text-indigo-800 font-semibold hover:underline">View PDF</button></td></tr>`).join('');
-                document.getElementById('tp-empty').classList.toggle('hidden', hist.length > 0);
-                this.navigate('teacher-profile');
-            },
-            preview: (id, type='paper') => { 
-                const collection = type === 'material' ? app.state.materials : app.state.papers;
-                const p = collection.find(x => x.id == id); 
-                if(p) {
-                    document.getElementById('prev-frame').src = p.fileUrl; 
-                    document.getElementById('modal-preview').classList.remove('hidden'); 
-                }
-            },
-            download: (url) => window.open(url, '_blank'),
-            closeModal: (id) => document.getElementById(id).classList.add('hidden'),
-            openUploadModal: () => {
-                document.getElementById('modal-upload').classList.remove('hidden');
-                app.setUploadType('paper');
-            },
-            toggleAdminLogin: function() {
-                if (this.state.user) {
-                    this.navigate('admin');
-                } else {
-                    document.getElementById('modal-login').classList.remove('hidden');
-                    setTimeout(() => document.getElementById('log-id').focus(), 100); 
-                }
-            },
-            doLogin: () => { if(document.getElementById('log-id').value === 'admin' && document.getElementById('log-pass').value === 'admin') { app.state.user = 'admin'; app.closeModal('modal-login'); app.navigate('admin'); app.setAdminTab('uploads'); } },
-            logout: () => { app.state.user = null; app.navigate('home'); },
-            setAdminTab: (t) => { 
-                ['uploads','mat_uploads','papers','materials','faculty'].forEach(x => { 
-                    const div = document.getElementById('adm-'+x);
-                    const btn = document.getElementById('tab-'+x);
-                    if(div && btn) {
-                        div.classList.add('hidden'); 
-                        btn.classList.remove('border-indigo-500', 'text-indigo-600', 'font-bold'); 
-                        btn.classList.add('border-transparent', 'text-slate-500', 'font-medium');
-                    }
-                });
-                document.getElementById('adm-'+t).classList.remove('hidden'); 
-                const actBtn = document.getElementById('tab-'+t);
-                actBtn.classList.remove('border-transparent', 'text-slate-500', 'font-medium');
-                actBtn.classList.add('border-indigo-500', 'text-indigo-600', 'font-bold');
-            },
-            openTeacherModal: (id=null) => { 
-                document.querySelector('#modal-teacher form').reset(); document.getElementById('edit-tid').value=''; document.getElementById('edit-img').value=''; 
-                if(id) { const t = app.state.teachers.find(x => x.id == id); document.getElementById('edit-tid').value=t.id; document.getElementById('edit-name').value=t.name; document.getElementById('edit-dept').value=t.dept; document.getElementById('edit-desig').value=t.designation; document.getElementById('edit-bio').value=t.bio; document.getElementById('edit-img').value=t.img; }
-                document.getElementById('modal-teacher').classList.remove('hidden'); 
-            },
-            updateCourseCodes: (t) => { document.getElementById('up-code').innerHTML = (t==='theory' ? ['CSE101','CSE102','MAT101'] : ['CSE105','CSE106']).map(c => `<option>${c}</option>`).join(''); },
-            populateStaticDropdowns: () => { 
-                const deptsList = [
-                    'Business Administration', 'Pharmacy', 'Microbiology', 'Environmental Science', 'English', 'Economics', 'Film and Media Studies', 'Journalism and Media Studies', 'Public Administration', 'Law', 'Computer Science & Engineering', 'Electrical & Electronic Engineering', 'Civil Engineering', 'Architecture'
-                ];
                 const depts = deptsList.map(d => `<option ${d === 'Computer Science & Engineering' ? 'selected' : ''}>${d}</option>`).join('');
                 ['up-dept', 'filter-dept', 'edit-dept', 'mat-filter-dept'].forEach(id => { const el = document.getElementById(id); if(el) el.innerHTML += depts; });
                 
