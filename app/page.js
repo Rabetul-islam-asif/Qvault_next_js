@@ -348,6 +348,12 @@ export default function QVaultApp() {
             console.error('Approve Delete Error:', deleteError);
             showToast('Warning', 'Approved but failed to remove from pending', 'warning');
         } else {
+            // Manually update local state
+            if (type === 'paper') {
+                setPendingPapers(prev => prev.filter(i => i.id !== item.id));
+            } else {
+                setPendingMaterials(prev => prev.filter(i => i.id !== item.id));
+            }
             showToast('Approved', 'Item added to database');
         }
     };
@@ -362,6 +368,12 @@ export default function QVaultApp() {
             console.error('Reject Error:', error);
             showToast('Error', 'Reject failed: ' + error.message, 'error');
         } else {
+            // Manually update local state
+            if (type === 'paper') {
+                setPendingPapers(prev => prev.filter(i => i.id !== id));
+            } else {
+                setPendingMaterials(prev => prev.filter(i => i.id !== id));
+            }
             showToast('Rejected', 'Item removed');
         }
     };
