@@ -1,16 +1,3 @@
-'use client';
-
-import React, { useState, useEffect, useRef } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-// --- SUPABASE CONFIGURATION ---
-const SUPABASE_URL = "https://nfahvsssiokaprylfrxv.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mYWh2c3NzaW9rYXByeWxmcnh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzNDg2MDEsImV4cCI6MjA3OTkyNDYwMX0.yiq_rqI7_EDNX3eAnK50pgafFjZICoCrhnf8IStwpKs";
-
-// --- COURSE DATABASE ---
-const COURSE_DB = [
-    { code: "10031CSE320", name: "Technical Writing and Research Methodology", credits: 3, type: "theory" },
-    { code: "20031ORE101", name: "Freshman Orientation", credits: 0.5, type: "theory" },
     { code: "300611CSE233", name: "Computer Organization and Architecture", credits: 3, pre: "0611CSE133", type: "theory" },
     { code: "300611CSE234", name: "Computer Organization and Architecture Sessional", credits: 1.5, pre: "0611CSE133", type: "lab" },
     { code: "300611CSE313", name: "Operating System", credits: 3, pre: "0611CSE233", type: "theory" },
@@ -343,10 +330,14 @@ export default function QVaultApp() {
             return;
         }
 
-        const { error: deleteError } = await supabase.from(sourceTable).delete().eq('id', item.id);
+        const { error: deleteError, data: deleteData } = await supabase.from(sourceTable).delete().eq('id', item.id).select();
+        
         if (deleteError) {
             console.error('Approve Delete Error:', deleteError);
             showToast('Warning', 'Approved but failed to remove from pending', 'warning');
+        } else if (!deleteData || deleteData.length === 0) {
+            console.error('Approve Delete Failed: No rows deleted');
+            showToast('Warning', 'Approved, but could not remove from pending (Permission Issue)', 'warning');
         } else {
             // Manually update local state
             if (type === 'paper') {
@@ -363,10 +354,14 @@ export default function QVaultApp() {
         if (!confirm('Reject this item?')) return;
         const table = type === 'paper' ? 'pending_papers' : 'pending_materials';
         
-        const { error } = await supabase.from(table).delete().eq('id', id);
+        const { error, data } = await supabase.from(table).delete().eq('id', id).select();
+        
         if (error) {
             console.error('Reject Error:', error);
             showToast('Error', 'Reject failed: ' + error.message, 'error');
+        } else if (!data || data.length === 0) {
+            console.error('Reject Failed: No rows deleted');
+            showToast('Error', 'Permission Denied: Could not delete item. Run SQL Fix.', 'error');
         } else {
             // Manually update local state
             if (type === 'paper') {
@@ -382,11 +377,23 @@ export default function QVaultApp() {
         if (!supabase) return;
         if (!confirm('Delete permanently?')) return;
         
-        const { error } = await supabase.from(table).delete().eq('id', id);
+        const { error, data } = await supabase.from(table).delete().eq('id', id).select();
+        
         if (error) {
             console.error('Delete Error:', error);
             showToast('Error', 'Delete failed: ' + error.message, 'error');
+        } else if (!data || data.length === 0) {
+            console.error('Delete Failed: No rows deleted');
+            showToast('Error', 'Permission Denied: Could not delete item. Run SQL Fix.', 'error');
         } else {
+            // Manually update local state
+            if (table === 'papers') {
+                setPapers(prev => prev.filter(i => i.id !== id));
+            } else if (table === 'materials') {
+                setMaterials(prev => prev.filter(i => i.id !== id));
+            } else if (table === 'teachers') {
+                setTeachers(prev => prev.filter(i => i.id !== id));
+            }
             showToast('Deleted', 'Item removed permanently');
         }
     };
