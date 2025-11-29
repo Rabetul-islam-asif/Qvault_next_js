@@ -287,16 +287,19 @@ export default function QVaultApp() {
             };
 
             if (uploadType === 'paper') {
-                await supabase.from('pending_papers').insert({ ...commonData, exam: uploadFormData.exam, type: uploadFormData.type });
+                const { error } = await supabase.from('pending_papers').insert({ ...commonData, exam: uploadFormData.exam, type: uploadFormData.type });
+                if (error) throw error;
             } else {
-                await supabase.from('pending_materials').insert({ ...commonData, type: uploadFormData.matType });
+                const { error } = await supabase.from('pending_materials').insert({ ...commonData, type: uploadFormData.matType });
+                if (error) throw error;
             }
 
             showToast('Success', 'Submitted for approval', 'success');
             setShowUploadModal(false);
             setUploadFile(null);
         } catch (e) {
-            showToast('Error', e.message, 'error');
+            console.error('Upload Error:', e);
+            showToast('Error', e.message || 'Upload failed', 'error');
         } finally {
             setIsUploading(false);
         }
@@ -318,26 +321,62 @@ export default function QVaultApp() {
 
     const approveItem = async (item, type) => {
         if (!supabase) return;
-        const { id: _, uploadedAt: __, ...data } = item;
+        
+        // Explicitly construct payload to avoid schema mismatch
+        const payload = {
+            courseCode: item.courseCode,
+            courseName: item.courseName,
+            semester: item.semester,
+            dept: item.dept,
+            teacherId: item.teacherId,
+            fileUrl: item.fileUrl,
+            ...(type === 'paper' ? { exam: item.exam, type: item.type } : { type: item.type })
+        };
+
         const targetTable = type === 'paper' ? 'papers' : 'materials';
         const sourceTable = type === 'paper' ? 'pending_papers' : 'pending_materials';
         
-        await supabase.from(targetTable).insert(data);
-        await supabase.from(sourceTable).delete().eq('id', item.id);
-        showToast('Approved', 'Item added to database');
+        const { error: insertError } = await supabase.from(targetTable).insert(payload);
+        if (insertError) {
+            console.error('Approve Insert Error:', insertError);
+            showToast('Error', 'Insert failed: ' + insertError.message, 'error');
+            return;
+        }
+
+        const { error: deleteError } = await supabase.from(sourceTable).delete().eq('id', item.id);
+        if (deleteError) {
+            console.error('Approve Delete Error:', deleteError);
+            showToast('Warning', 'Approved but failed to remove from pending', 'warning');
+        } else {
+            showToast('Approved', 'Item added to database');
+        }
     };
 
     const rejectItem = async (id, type) => {
         if (!supabase) return;
         if (!confirm('Reject this item?')) return;
         const table = type === 'paper' ? 'pending_papers' : 'pending_materials';
-        await supabase.from(table).delete().eq('id', id);
+        
+        const { error } = await supabase.from(table).delete().eq('id', id);
+        if (error) {
+            console.error('Reject Error:', error);
+            showToast('Error', 'Reject failed: ' + error.message, 'error');
+        } else {
+            showToast('Rejected', 'Item removed');
+        }
     };
 
     const deleteItem = async (id, table) => {
         if (!supabase) return;
         if (!confirm('Delete permanently?')) return;
-        await supabase.from(table).delete().eq('id', id);
+        
+        const { error } = await supabase.from(table).delete().eq('id', id);
+        if (error) {
+            console.error('Delete Error:', error);
+            showToast('Error', 'Delete failed: ' + error.message, 'error');
+        } else {
+            showToast('Deleted', 'Item removed permanently');
+        }
     };
 
     // --- TEACHER PROFILE LOGIC ---
