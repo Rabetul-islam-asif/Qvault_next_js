@@ -431,12 +431,12 @@ export default function QVaultApp() {
 
                                         <div className="mt-8 relative max-w-lg">
                                             <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl blur opacity-25"></div>
-                                            <div className="relative bg-white rounded-xl shadow-xl p-2 flex items-center border border-slate-100">
-                                                <i className="fas fa-search text-slate-400 ml-4 text-lg"></i>
+                                            <div className="relative bg-white rounded-xl shadow-xl p-1 flex items-center border border-slate-100">
+                                                <i className="fas fa-search text-slate-400 ml-4 text-lg absolute left-0 z-10"></i>
                                                 <input 
                                                     type="text" 
                                                     placeholder="Search for courses, papers..." 
-                                                    className="flex-1 bg-transparent border-none focus:ring-0 outline-none text-slate-700 placeholder-slate-400 h-12 px-4 text-base font-medium"
+                                                    className="w-full bg-transparent border-none focus:ring-0 outline-none text-slate-700 placeholder-slate-400 h-12 pl-12 pr-24 text-base font-medium"
                                                     value={homeSearchQuery}
                                                     onChange={(e) => setHomeSearchQuery(e.target.value)}
                                                     onKeyDown={(e) => {
@@ -453,7 +453,7 @@ export default function QVaultApp() {
                                                             setView('vault');
                                                         }
                                                     }}
-                                                    className="bg-slate-900 text-white px-4 sm:px-6 h-12 rounded-lg font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20 flex items-center justify-center"
+                                                    className="absolute right-1 top-1 bottom-1 bg-slate-900 text-white px-4 sm:px-6 rounded-lg font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20 flex items-center justify-center"
                                                 >
                                                     Find
                                                 </button>
@@ -503,7 +503,10 @@ export default function QVaultApp() {
                 {view === 'vault' && (
                     <div className="h-full flex flex-col bg-slate-50 p-6 lg:p-10 overflow-y-auto">
                         <div className="mb-6 flex flex-wrap gap-4 justify-between items-end">
-                            <div><h3 className="text-2xl font-bold text-slate-900">Question Bank</h3><p className="text-sm text-slate-500 mt-1">Browse past exam papers</p></div>
+                            <div className="flex items-center gap-4">
+                                <button onClick={() => setView('home')} className="bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200 text-slate-500 hover:text-indigo-600 transition-colors font-bold flex items-center gap-2"><i className="fas fa-arrow-left"></i> Back</button>
+                                <div><h3 className="text-2xl font-bold text-slate-900">Question Bank</h3><p className="text-sm text-slate-500 mt-1">Browse past exam papers</p></div>
+                            </div>
                             <div className="flex items-center gap-3">
                                 <button onClick={() => setShowVaultFilter(true)} className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl font-bold hover:bg-slate-50 shadow-sm"><i className="fas fa-sliders-h text-indigo-500"></i> Filters</button>
                                 <span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-3 py-1 rounded-full">{papers.filter(p => 
@@ -550,7 +553,10 @@ export default function QVaultApp() {
                 {view === 'materials' && (
                     <div className="h-full flex flex-col bg-slate-50 p-6 lg:p-10 overflow-y-auto">
                         <div className="mb-6 flex flex-wrap gap-4 justify-between items-end">
-                            <div><h3 className="text-2xl font-bold text-slate-900">Course Materials</h3><p className="text-sm text-slate-500 mt-1">Slides, Books & Notes</p></div>
+                            <div className="flex items-center gap-4">
+                                <button onClick={() => setView('home')} className="bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200 text-slate-500 hover:text-indigo-600 transition-colors font-bold flex items-center gap-2"><i className="fas fa-arrow-left"></i> Back</button>
+                                <div><h3 className="text-2xl font-bold text-slate-900">Course Materials</h3><p className="text-sm text-slate-500 mt-1">Slides, Books & Notes</p></div>
+                            </div>
                             <div className="flex items-center gap-3">
                                 <button onClick={() => setShowMaterialsFilter(true)} className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl font-bold hover:bg-slate-50 shadow-sm"><i className="fas fa-sliders-h text-indigo-500"></i> Filters</button>
                                 <span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-3 py-1 rounded-full">{materials.filter(p => 
@@ -597,9 +603,12 @@ export default function QVaultApp() {
                 {/* COURSE LIST VIEW */}
                 {view === 'course-list' && (
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-                        <div className="text-center mb-16">
-                            <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">Course List</h2>
-                            <p className="mt-4 max-w-2xl mx-auto text-lg text-slate-500">Browse courses by department.</p>
+                        <div className="relative text-center mb-16">
+                            <button onClick={() => setView('home')} className="absolute left-0 top-0 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200 text-slate-500 hover:text-indigo-600 transition-colors font-bold flex items-center gap-2"><i className="fas fa-arrow-left"></i> Back</button>
+                            <div className="text-center">
+                                <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">Course List</h2>
+                                <p className="mt-4 max-w-2xl mx-auto text-lg text-slate-500">Browse courses by department.</p>
+                            </div>
                             <div className="mt-8 max-w-md mx-auto">
                                 <select value={courseListDept} onChange={(e) => setCourseListDept(e.target.value)} className="block w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none shadow-sm">
                                     {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
@@ -636,9 +645,12 @@ export default function QVaultApp() {
                 {/* FACULTY VIEW */}
                 {view === 'faculty' && (
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-                        <div className="text-center mb-16">
-                            <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">Meet the Faculty</h2>
-                            <p className="mt-4 max-w-2xl mx-auto text-lg text-slate-500">Browse professors and executives.</p>
+                        <div className="relative text-center mb-16">
+                            <button onClick={() => setView('home')} className="absolute left-0 top-0 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200 text-slate-500 hover:text-indigo-600 transition-colors font-bold flex items-center gap-2"><i className="fas fa-arrow-left"></i> Back</button>
+                            <div className="text-center">
+                                <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">Meet the Faculty</h2>
+                                <p className="mt-4 max-w-2xl mx-auto text-lg text-slate-500">Browse professors and executives.</p>
+                            </div>
                             <div className="mt-8 max-w-2xl mx-auto relative group">
                                 <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
                                 <div className="relative bg-white rounded-xl shadow-sm flex items-center border border-slate-200">
