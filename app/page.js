@@ -1,3 +1,16 @@
+'use client';
+
+import React, { useState, useEffect, useRef } from 'react';
+import { createClient } from '@supabase/supabase-js';
+
+// --- SUPABASE CONFIGURATION ---
+const SUPABASE_URL = 'https://imeykplylnqymupmofcb.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImltZXlrcGx5bG5xeW11cG1vZmNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4OTU1NzgsImV4cCI6MjA3OTQ3MTU3OH0.YjkgJ1eWVoM4PCP9bq8qMYKmdrqiwi2JBxk2l1woYZ4';
+
+// --- COURSE DATABASE ---
+const COURSE_DB = [
+    { code: "10031CSE320", name: "Technical Writing and Research Methodology", credits: 3, type: "theory" },
+    { code: "20031ORE101", name: "Freshman Orientation", credits: 0.5, type: "theory" },
     { code: "300611CSE233", name: "Computer Organization and Architecture", credits: 3, pre: "0611CSE133", type: "theory" },
     { code: "300611CSE234", name: "Computer Organization and Architecture Sessional", credits: 1.5, pre: "0611CSE133", type: "lab" },
     { code: "300611CSE313", name: "Operating System", credits: 3, pre: "0611CSE233", type: "theory" },
