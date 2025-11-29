@@ -191,6 +191,23 @@ export default function QVaultApp() {
         return () => window.removeEventListener('beforeinstallprompt', handler);
     }, []);
 
+    // 4. History State Management (Native Back Button)
+    useEffect(() => {
+        // Initial state
+        window.history.replaceState({ view: 'home' }, '', '#home');
+
+        const onPopState = (event) => {
+            if (event.state && event.state.view) {
+                setView(event.state.view);
+            } else {
+                setView('home');
+            }
+        };
+
+        window.addEventListener('popstate', onPopState);
+        return () => window.removeEventListener('popstate', onPopState);
+    }, []);
+
     // --- HELPERS ---
 
     const showToast = (title, msg, type = 'success') => {
@@ -208,6 +225,11 @@ export default function QVaultApp() {
     const getTeacherName = (id) => {
         const t = teachers.find(x => x.id == id);
         return t ? t.name : (isNaN(id) ? id : 'Guest Faculty');
+    };
+
+    const navigate = (newView) => {
+        window.history.pushState({ view: newView }, '', `#${newView}`);
+        setView(newView);
     };
 
     // --- UPLOAD LOGIC ---
@@ -288,7 +310,7 @@ export default function QVaultApp() {
         if (id === 'sub-admin' && pass === 'admin2025') {
             setUser('admin');
             setShowLoginModal(false);
-            setView('admin');
+            navigate('admin');
         } else {
             alert('Invalid Credentials');
         }
@@ -366,7 +388,7 @@ export default function QVaultApp() {
             <nav className="glass sticky top-0 z-40 w-full bg-white/85 backdrop-blur-md border-b border-slate-200/80">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between h-16 sm:h-20">
-                        <div className="flex items-center cursor-pointer group" onClick={() => setView('home')}>
+                        <div className="flex items-center cursor-pointer group" onClick={() => navigate('home')}>
                             <div className="flex-shrink-0 flex items-center gap-3">
                                 <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-indigo-500/30 group-hover:scale-105 transition-transform duration-300">Q</div>
                                 <div className="flex flex-col">
@@ -378,7 +400,7 @@ export default function QVaultApp() {
                         <div className="hidden md:flex md:items-center md:space-x-2">
                             <div className="flex items-center bg-slate-100/50 rounded-full p-1 border border-slate-200/50 mr-4">
                                 {['vault', 'materials', 'faculty'].map(v => (
-                                    <a key={v} href="#" onClick={(e) => { e.preventDefault(); setView(v); }} className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${view === v ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-indigo-600 hover:bg-white'}`}>
+                                    <a key={v} href="#" onClick={(e) => { e.preventDefault(); navigate(v); }} className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${view === v ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-indigo-600 hover:bg-white'}`}>
                                         {v.charAt(0).toUpperCase() + v.slice(1)}
                                     </a>
                                 ))}
@@ -388,7 +410,7 @@ export default function QVaultApp() {
                                     <i className="fas fa-download mr-2"></i> Install App
                                 </button>
                             )}
-                            <a href="#" onClick={(e) => { e.preventDefault(); user ? setView('admin') : setShowLoginModal(true); }} className="text-slate-400 hover:text-indigo-600 p-2 transition-colors mr-2" title="Admin"><i className="fas fa-cog"></i></a>
+                            <a href="#" onClick={(e) => { e.preventDefault(); user ? navigate('admin') : setShowLoginModal(true); }} className="text-slate-400 hover:text-indigo-600 p-2 transition-colors mr-2" title="Admin"><i className="fas fa-cog"></i></a>
                             <button onClick={() => { setUploadType('paper'); setShowUploadModal(true); }} className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-slate-900/20 hover:shadow-xl transition-all transform hover:-translate-y-0.5 flex items-center gap-2">
                                 <i className="fas fa-plus"></i> <span>Upload</span>
                             </button>
@@ -396,7 +418,7 @@ export default function QVaultApp() {
                         <div className="flex items-center md:hidden gap-3">
                             {deferredPrompt && <button onClick={installPWA} className="text-indigo-600 bg-indigo-50 border border-indigo-200 p-2.5 rounded-xl shadow-sm animate-pulse"><i className="fas fa-download"></i></button>}
                             <button onClick={() => { setUploadType('paper'); setShowUploadModal(true); }} className="text-white bg-indigo-600 shadow-indigo-500/30 shadow-md p-2.5 rounded-xl"><i className="fas fa-plus"></i></button>
-                            <button onClick={() => setView('vault')} className="text-slate-600 bg-white border border-slate-200 p-2.5 rounded-xl"><i className="fas fa-search"></i></button>
+                            <button onClick={() => navigate('vault')} className="text-slate-600 bg-white border border-slate-200 p-2.5 rounded-xl"><i className="fas fa-search"></i></button>
                         </div>
                     </div>
                 </div>
@@ -423,10 +445,10 @@ export default function QVaultApp() {
                                         </h1>
                                         <p className="mt-4 text-base text-slate-500 sm:mt-5 sm:text-lg md:mt-5 md:text-xl leading-relaxed">Access a curated archive of past papers, slides, and class notes instantly.</p>
                                         <div className="mt-8 flex gap-3 flex-wrap justify-center lg:justify-start">
-                                            <button onClick={() => setView('vault')} className="px-5 py-2.5 rounded-xl font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-colors text-sm">Question Bank</button>
-                                            <button onClick={() => setView('course-list')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Course List</button>
-                                            <button onClick={() => setView('materials')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Materials</button>
-                                            <button onClick={() => setView('faculty')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Faculty</button>
+                                            <button onClick={() => navigate('vault')} className="px-5 py-2.5 rounded-xl font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-colors text-sm">Question Bank</button>
+                                            <button onClick={() => navigate('course-list')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Course List</button>
+                                            <button onClick={() => navigate('materials')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Materials</button>
+                                            <button onClick={() => navigate('faculty')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Faculty</button>
                                         </div>
 
                                         <div className="mt-8 relative max-w-lg">
@@ -442,7 +464,7 @@ export default function QVaultApp() {
                                                     onKeyDown={(e) => {
                                                         if (e.key === 'Enter' && homeSearchQuery.trim()) {
                                                             setFilters(prev => ({ ...prev, vault: { ...prev.vault, search: homeSearchQuery } }));
-                                                            setView('vault');
+                                                            navigate('vault');
                                                         }
                                                     }}
                                                 />
@@ -450,7 +472,7 @@ export default function QVaultApp() {
                                                     onClick={() => {
                                                         if (homeSearchQuery.trim()) {
                                                             setFilters(prev => ({ ...prev, vault: { ...prev.vault, search: homeSearchQuery } }));
-                                                            setView('vault');
+                                                            navigate('vault');
                                                         }
                                                     }}
                                                     className="absolute right-1 top-1 bottom-1 bg-slate-900 text-white px-4 sm:px-6 rounded-lg font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20 flex items-center justify-center"
@@ -504,7 +526,6 @@ export default function QVaultApp() {
                     <div className="h-full flex flex-col bg-slate-50 p-6 lg:p-10 overflow-y-auto">
                         <div className="mb-6 flex flex-wrap gap-4 justify-between items-end">
                             <div className="flex items-center gap-4">
-                                <button onClick={() => setView('home')} className="bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200 text-slate-500 hover:text-indigo-600 transition-colors font-bold flex items-center gap-2"><i className="fas fa-arrow-left"></i> Back</button>
                                 <div><h3 className="text-2xl font-bold text-slate-900">Question Bank</h3><p className="text-sm text-slate-500 mt-1">Browse past exam papers</p></div>
                             </div>
                             <div className="flex items-center gap-3">
@@ -554,7 +575,6 @@ export default function QVaultApp() {
                     <div className="h-full flex flex-col bg-slate-50 p-6 lg:p-10 overflow-y-auto">
                         <div className="mb-6 flex flex-wrap gap-4 justify-between items-end">
                             <div className="flex items-center gap-4">
-                                <button onClick={() => setView('home')} className="bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200 text-slate-500 hover:text-indigo-600 transition-colors font-bold flex items-center gap-2"><i className="fas fa-arrow-left"></i> Back</button>
                                 <div><h3 className="text-2xl font-bold text-slate-900">Course Materials</h3><p className="text-sm text-slate-500 mt-1">Slides, Books & Notes</p></div>
                             </div>
                             <div className="flex items-center gap-3">
@@ -604,7 +624,6 @@ export default function QVaultApp() {
                 {view === 'course-list' && (
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
                         <div className="relative text-center mb-16">
-                            <button onClick={() => setView('home')} className="absolute left-0 top-0 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200 text-slate-500 hover:text-indigo-600 transition-colors font-bold flex items-center gap-2"><i className="fas fa-arrow-left"></i> Back</button>
                             <div className="text-center">
                                 <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">Course List</h2>
                                 <p className="mt-4 max-w-2xl mx-auto text-lg text-slate-500">Browse courses by department.</p>
@@ -622,7 +641,7 @@ export default function QVaultApp() {
                                 const allCourses = [...staticCourses, ...dynamicCourses].filter((v,i,a)=>a.findIndex(t=>(t.code === v.code))===i).sort((a,b) => a.code.localeCompare(b.code));
 
                                 return allCourses.map((c, i) => (
-                                    <div key={i} onClick={() => { setFilters(prev => ({ ...prev, vault: { ...prev.vault, search: c.code } })); setView('vault'); }} className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between">
+                                    <div key={i} onClick={() => { setFilters(prev => ({ ...prev, vault: { ...prev.vault, search: c.code } })); navigate('vault'); }} className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between">
                                         <div>
                                             <div className="flex items-center justify-between mb-2">
                                                 <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{c.code}</span>
@@ -646,7 +665,6 @@ export default function QVaultApp() {
                 {view === 'faculty' && (
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
                         <div className="relative text-center mb-16">
-                            <button onClick={() => setView('home')} className="absolute left-0 top-0 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200 text-slate-500 hover:text-indigo-600 transition-colors font-bold flex items-center gap-2"><i className="fas fa-arrow-left"></i> Back</button>
                             <div className="text-center">
                                 <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">Meet the Faculty</h2>
                                 <p className="mt-4 max-w-2xl mx-auto text-lg text-slate-500">Browse professors and executives.</p>
@@ -676,7 +694,7 @@ export default function QVaultApp() {
                                 return (designationRank[a.designation] || 99) - (designationRank[b.designation] || 99);
                             })
                             .map(t => (
-                                <div key={t.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 flex flex-col items-center text-center hover:translate-y-[-4px] transition-all duration-300 cursor-pointer group" onClick={() => { setTeacherProfileId(t.id); setView('teacher-profile'); }}>
+                                <div key={t.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 flex flex-col items-center text-center hover:translate-y-[-4px] transition-all duration-300 cursor-pointer group" onClick={() => { setTeacherProfileId(t.id); navigate('teacher-profile'); }}>
                                     <div className="relative w-28 h-28 mb-5">
                                         <div className="absolute inset-0 bg-indigo-100 rounded-full blur-lg opacity-50 group-hover:opacity-75 transition-opacity"></div>
                                         <img className="relative w-28 h-28 rounded-full object-cover border-4 border-white shadow-md" src={t.img || 'https://via.placeholder.com/150'} alt={t.name} />
