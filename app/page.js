@@ -268,10 +268,14 @@ export default function QVaultApp() {
         // Check if images were selected
         const firstFile = files[0];
         if (firstFile.type.startsWith('image/')) {
-            // Handle images - store for preview and conversion
-            const imageFiles = Array.from(files).slice(0, 4); // Max 4 images
-            setSelectedImages(imageFiles);
+            // Handle images - add to existing selection (max 4 total)
+            const newImages = Array.from(files);
+            setSelectedImages(prev => {
+                const combined = [...prev, ...newImages];
+                return combined.slice(0, 4); // Max 4 images total
+            });
             setUploadFile(null); // Clear any previous PDF
+            e.target.value = ''; // Reset input to allow selecting same file again
         } else if (firstFile.type === 'application/pdf') {
             // Handle PDF directly
             setUploadFile(firstFile);
@@ -289,6 +293,7 @@ export default function QVaultApp() {
         setIsConvertingToPDF(true);
         
         try {
+            console.log('Starting PDF conversion for', selectedImages.length, 'images');
             const pdf = new jsPDF({
                 orientation: 'portrait',
                 unit: 'mm',
@@ -301,18 +306,21 @@ export default function QVaultApp() {
             
             for (let i = 0; i < selectedImages.length; i++) {
                 const imageFile = selectedImages[i];
+                console.log(`Processing image ${i+1}/${selectedImages.length}:`, imageFile.name);
                 
                 // Read image as data URL
-                const imageData = await new Promise((resolve) => {
+                const imageData = await new Promise((resolve, reject) => {
                     const reader = new FileReader();
                     reader.onload = (e) => resolve(e.target.result);
+                    reader.onerror = (e) => reject(new Error('Failed to read image'));
                     reader.readAsDataURL(imageFile);
                 });
                 
                 // Get image dimensions
-                const img = await new Promise((resolve) => {
+                const img = await new Promise((resolve, reject) => {
                     const image = new Image();
                     image.onload = () => resolve(image);
+                    image.onerror = () => reject(new Error('Failed to load image'));
                     image.src = imageData;
                 });
                 
@@ -340,13 +348,14 @@ export default function QVaultApp() {
             const pdfBlob = pdf.output('blob');
             const pdfFile = new File([pdfBlob], 'question.pdf', { type: 'application/pdf' });
             
+            console.log('PDF created successfully, size:', pdfBlob.size, 'bytes');
             setIsConvertingToPDF(false);
             return pdfFile;
             
         } catch (error) {
             console.error('Error converting images to PDF:', error);
             setIsConvertingToPDF(false);
-            showToast('Error', 'Failed to convert images to PDF', 'error');
+            showToast('Error', 'Failed to convert images to PDF: ' + error.message, 'error');
             return null;
         }
     };
@@ -366,13 +375,15 @@ export default function QVaultApp() {
         setIsUploading(true);
 
         try {
+            console.log('Uploading file:', fileToUpload.name, 'Size:', fileToUpload.size, 'bytes');
             const fd = new FormData();
             fd.append('reqtype', 'fileupload');
-            fd.append('fileToUpload', uploadFile);
+            fd.append('fileToUpload', fileToUpload);
             const res = await fetch('https://corsproxy.io/?' + encodeURIComponent('https://catbox.moe/user/api.php'), { method: 'POST', body: fd });
             const url = await res.text();
+            console.log('Upload response:', url);
             
-            if (!url.startsWith('http')) throw new Error('Upload failed');
+            if (!url.startsWith('http')) throw new Error('Upload failed: ' + url);
 
             const commonData = {
                 courseCode: uploadFormData.code,
@@ -1247,26 +1258,63 @@ export default function QVaultApp() {
                                     <div className="sm:col-span-2 mt-2">
                                         <div className="border-2 border-dashed border-slate-300 rounded-2xl px-6 py-10 text-center hover:bg-indigo-50 hover:border-indigo-300 transition-all bg-slate-50 cursor-pointer relative group">
                                             <input 
+                                                id="file-upload-input"
                                                 type="file" 
                                                 accept="image/*,application/pdf" 
-                                                capture="environment"
-                                                multiple 
                                                 onChange={handleFileChange} 
                                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                                                style={{ display: 'none' }}
                                             />
                                             <div className="mx-auto h-16 w-16 text-indigo-500 bg-white rounded-full flex items-center justify-center shadow-lg shadow-indigo-100 mb-4 group-hover:scale-110 transition-transform">
-                                                <i className={`fas ${selectedImages.length > 0 ? 'fa-camera' : 'fa-cloud-upload-alt'} text-2xl`}></i>
+                                                <i className={`fas ${selectedImages.length > 0 ? 'fa-images' : 'fa-cloud-upload-alt'} text-2xl`}></i>
                                             </div>
-                                            <p className="text-sm text-slate-600 font-medium">
+                                            <p className="text-sm text-slate-600 font-medium mb-3">
                                                 {uploadFile 
                                                     ? uploadFile.name 
                                                     : selectedImages.length > 0 
                                                     ? `${selectedImages.length} image${selectedImages.length > 1 ? 's' : ''} selected` 
-                                                    : 'Click to upload PDF or capture images (Max 4 images)'
+                                                    : 'Upload PDF or capture/select images'
                                                 }
                                             </p>
-                                            <p className="text-xs text-slate-400 mt-1">
-                                                {selectedImages.length === 0 ? 'PDF or Images • Camera supported on mobile' : 'Images will be converted to PDF automatically'}
+                                            
+                                            {/* Action Buttons */}
+                                            <div className="flex gap-2 justify-center flex-wrap">
+                                                {selectedImages.length < 4 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const input = document.getElementById('file-upload-input');
+                                                            input.accept = 'image/*';
+                                                            input.removeAttribute('multiple');
+                                                            input.click();
+                                                        }}
+                                                        className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-md transition-all flex items-center gap-2"
+                                                    >
+                                                        <i className="fas fa-camera"></i>
+                                                        {selectedImages.length === 0 ? 'Capture/Select Image' : `Add Photo (${selectedImages.length}/4)`}
+                                                    </button>
+                                                )}
+                                                {selectedImages.length === 0 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const input = document.getElementById('file-upload-input');
+                                                            input.accept = 'application/pdf';
+                                                            input.removeAttribute('multiple');
+                                                            input.click();
+                                                        }}
+                                                        className="bg-slate-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-700 shadow-md transition-all flex items-center gap-2"
+                                                    >
+                                                        <i className="fas fa-file-pdf"></i>
+                                                        Upload PDF
+                                                    </button>
+                                                )}
+                                            </div>
+                                            
+                                            <p className="text-xs text-slate-400 mt-3">
+                                                {selectedImages.length === 0 ? 'Max 4 images • Images will be converted to PDF' : selectedImages.length === 4 ? 'Maximum 4 images reached' : `${4 - selectedImages.length} more image${4 - selectedImages.length > 1 ? 's' : ''} can be added`}
                                             </p>
                                         </div>
                                         
