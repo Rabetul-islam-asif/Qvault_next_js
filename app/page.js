@@ -1340,7 +1340,8 @@ export default function QVaultApp() {
                                                         </div>
                                                         <button
                                                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeImage(index); }}
-                                                            className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-600"
+                                                            className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 hover:scale-110 transition-all"
+                                                            title="Remove this image"
                                                         >
                                                             <i className="fas fa-times text-xs"></i>
                                                         </button>
