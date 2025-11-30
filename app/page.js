@@ -431,11 +431,14 @@ export default function QVaultApp() {
 
     const saveTeacher = async () => {
         if (!supabase) return;
-        const { id, ...data } = teacherForm;
+        const { id, desig, ...data } = teacherForm;
+        
+        // Map 'desig' to 'designation' for database
+        const dbData = { ...data, designation: desig };
         
         const { error } = id 
-            ? await supabase.from('teachers').update(data).eq('id', id)
-            : await supabase.from('teachers').insert(data);
+            ? await supabase.from('teachers').update(dbData).eq('id', id)
+            : await supabase.from('teachers').insert(dbData);
 
         if (error) {
             console.error('Error saving teacher:', error);
