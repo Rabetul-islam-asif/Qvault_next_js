@@ -1,7 +1,7 @@
 'use client';
-
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import jsPDF from 'jspdf';
 
 // --- SUPABASE CONFIGURATION ---
 const SUPABASE_URL = 'https://nfahvsssiokaprylfrxv.supabase.co';
@@ -117,6 +117,8 @@ export default function QVaultApp() {
         teacherId: 'Additional'
     });
     const [uploadFile, setUploadFile] = useState(null);
+    const [selectedImages, setSelectedImages] = useState([]);
+    const [isConvertingToPDF, setIsConvertingToPDF] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
 
     // Filters State
@@ -259,13 +261,108 @@ export default function QVaultApp() {
         });
     };
 
-    const handleFileChange = (e) => {
-        if (e.target.files && e.target.files[0]) setUploadFile(e.target.files[0]);
+    const handleFileChange = async (e) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        // Check if images were selected
+        const firstFile = files[0];
+        if (firstFile.type.startsWith('image/')) {
+            // Handle images - store for preview and conversion
+            const imageFiles = Array.from(files).slice(0, 4); // Max 4 images
+            setSelectedImages(imageFiles);
+            setUploadFile(null); // Clear any previous PDF
+        } else if (firstFile.type === 'application/pdf') {
+            // Handle PDF directly
+            setUploadFile(firstFile);
+            setSelectedImages([]); // Clear any selected images
+        }
+    };
+
+    const removeImage = (index) => {
+        setSelectedImages(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const convertImagesToPDF = async () => {
+        if (selectedImages.length === 0) return null;
+        
+        setIsConvertingToPDF(true);
+        
+        try {
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
+            
+            const pageWidth = 210; // A4 width in mm
+            const pageHeight = 297; // A4 height in mm
+            const margin = 10;
+            
+            for (let i = 0; i < selectedImages.length; i++) {
+                const imageFile = selectedImages[i];
+                
+                // Read image as data URL
+                const imageData = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.readAsDataURL(imageFile);
+                });
+                
+                // Get image dimensions
+                const img = await new Promise((resolve) => {
+                    const image = new Image();
+                    image.onload = () => resolve(image);
+                    image.src = imageData;
+                });
+                
+                // Calculate dimensions to fit page while maintaining aspect ratio
+                const imgWidth = img.width;
+                const imgHeight = img.height;
+                const ratio = Math.min(
+                    (pageWidth - 2 * margin) / imgWidth,
+                    (pageHeight - 2 * margin) / imgHeight
+                );
+                
+                const width = imgWidth * ratio;
+                const height = imgHeight * ratio;
+                const x = (pageWidth - width) / 2;
+                const y = (pageHeight - height) / 2;
+                
+                // Add new page for each image except the first
+                if (i > 0) pdf.addPage();
+                
+                // Add image to PDF
+                pdf.addImage(imageData, 'JPEG', x, y, width, height);
+            }
+            
+            // Convert PDF to blob
+            const pdfBlob = pdf.output('blob');
+            const pdfFile = new File([pdfBlob], 'question.pdf', { type: 'application/pdf' });
+            
+            setIsConvertingToPDF(false);
+            return pdfFile;
+            
+        } catch (error) {
+            console.error('Error converting images to PDF:', error);
+            setIsConvertingToPDF(false);
+            showToast('Error', 'Failed to convert images to PDF', 'error');
+            return null;
+        }
     };
 
     const submitUpload = async () => {
         if (!supabase) return showToast('Error', 'Database connection not ready', 'error');
-        if (!uploadFile) return showToast('Error', 'Please select a PDF file', 'error');
+        
+        let fileToUpload = uploadFile;
+        
+        // If images are selected, convert them to PDF first
+        if (selectedImages.length > 0) {
+            fileToUpload = await convertImagesToPDF();
+            if (!fileToUpload) return; // Conversion failed
+        }
+        
+        if (!fileToUpload) return showToast('Error', 'Please select a PDF file or images', 'error');
         setIsUploading(true);
 
         try {
@@ -297,6 +394,7 @@ export default function QVaultApp() {
             showToast('Success', 'Submitted for approval', 'success');
             setShowUploadModal(false);
             setUploadFile(null);
+            setSelectedImages([]);
         } catch (e) {
             console.error('Upload Error:', e);
             showToast('Error', e.message || 'Upload failed', 'error');
@@ -1148,16 +1246,72 @@ export default function QVaultApp() {
                                     </div>
                                     <div className="sm:col-span-2 mt-2">
                                         <div className="border-2 border-dashed border-slate-300 rounded-2xl px-6 py-10 text-center hover:bg-indigo-50 hover:border-indigo-300 transition-all bg-slate-50 cursor-pointer relative group">
-                                            <input type="file" accept=".pdf" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                                            <div className="mx-auto h-16 w-16 text-indigo-500 bg-white rounded-full flex items-center justify-center shadow-lg shadow-indigo-100 mb-4 group-hover:scale-110 transition-transform"><i className="fas fa-cloud-upload-alt text-2xl"></i></div>
-                                            <p className="text-sm text-slate-600 font-medium">{uploadFile ? uploadFile.name : 'Click to upload PDF (Max 200MB)'}</p>
-                                            <p className="text-xs text-slate-400 mt-1">Drag and drop supported</p>
+                                            <input 
+                                                type="file" 
+                                                accept="image/*,application/pdf" 
+                                                capture="environment"
+                                                multiple 
+                                                onChange={handleFileChange} 
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                                            />
+                                            <div className="mx-auto h-16 w-16 text-indigo-500 bg-white rounded-full flex items-center justify-center shadow-lg shadow-indigo-100 mb-4 group-hover:scale-110 transition-transform">
+                                                <i className={`fas ${selectedImages.length > 0 ? 'fa-camera' : 'fa-cloud-upload-alt'} text-2xl`}></i>
+                                            </div>
+                                            <p className="text-sm text-slate-600 font-medium">
+                                                {uploadFile 
+                                                    ? uploadFile.name 
+                                                    : selectedImages.length > 0 
+                                                    ? `${selectedImages.length} image${selectedImages.length > 1 ? 's' : ''} selected` 
+                                                    : 'Click to upload PDF or capture images (Max 4 images)'
+                                                }
+                                            </p>
+                                            <p className="text-xs text-slate-400 mt-1">
+                                                {selectedImages.length === 0 ? 'PDF or Images • Camera supported on mobile' : 'Images will be converted to PDF automatically'}
+                                            </p>
                                         </div>
+                                        
+                                        {/* Image Previews */}
+                                        {selectedImages.length > 0 && (
+                                            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                                {selectedImages.map((img, index) => (
+                                                    <div key={index} className="relative group">
+                                                        <img 
+                                                            src={URL.createObjectURL(img)} 
+                                                            alt={`Preview ${index + 1}`}
+                                                            className="w-full h-24 object-cover rounded-lg border-2 border-slate-200 shadow-sm"
+                                                        />
+                                                        <div className="absolute top-1 left-1 bg-slate-900/80 text-white text-[10px] font-bold px-2 py-0.5 rounded">
+                                                            Page {index + 1}
+                                                        </div>
+                                                        <button
+                                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeImage(index); }}
+                                                            className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-600"
+                                                        >
+                                                            <i className="fas fa-times text-xs"></i>
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        
+                                        {/* Conversion Status */}
+                                        {isConvertingToPDF && (
+                                            <div className="mt-4 bg-indigo-50 border border-indigo-200 rounded-lg p-3 flex items-center gap-3">
+                                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
+                                                <span className="text-sm font-medium text-indigo-700">Converting images to PDF...</span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="mt-8 pt-6 border-t border-slate-100 flex justify-end gap-3">
                                     <button onClick={() => setShowUploadModal(false)} className="px-6 py-3 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 transition-colors">Cancel</button>
-                                    <button onClick={submitUpload} disabled={isUploading} className="px-8 py-3 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 transition-all transform hover:-translate-y-0.5">{isUploading ? 'Processing...' : 'Submit Content'}</button>
+                                    <button 
+                                        onClick={submitUpload} 
+                                        disabled={isUploading || isConvertingToPDF} 
+                                        className="px-8 py-3 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {isConvertingToPDF ? 'Converting...' : isUploading ? 'Uploading...' : 'Submit Content'}
+                                    </button>
                                 </div>
                             </div>
                         </div>
