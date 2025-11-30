@@ -123,7 +123,7 @@ export default function QVaultApp() {
     const [filters, setFilters] = useState({
         vault: { search: '', dept: '', semSeason: '', semYear: '', type: '' },
         materials: { search: '', dept: '', semSeason: '', semYear: '', teacher: '', course: '', type: '' },
-        faculty: { search: '' },
+        faculty: { search: '', dept: 'Computer Science & Engineering' },
         adminPaper: { search: '' },
         adminMaterial: { search: '' }
     });
@@ -743,16 +743,21 @@ export default function QVaultApp() {
                                 <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">Meet the Faculty</h2>
                                 <p className="mt-4 max-w-2xl mx-auto text-lg text-slate-500">Browse professors and executives.</p>
                             </div>
-                            <div className="mt-8 max-w-2xl mx-auto relative group">
-                                <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
-                                <div className="relative bg-white rounded-xl shadow-sm flex items-center border border-slate-200">
-                                    <i className="fas fa-search absolute left-4 text-slate-400"></i>
-                                    <input type="text" className="block w-full pl-12 pr-4 py-4 bg-transparent border-none focus:ring-0 text-slate-800 placeholder-slate-400" placeholder="Find a Professor..." onInput={(e) => setFilters(prev => ({ ...prev, faculty: { search: e.target.value } }))} />
+                            <div className="mt-8 max-w-2xl mx-auto space-y-4">
+                                <select value={filters.faculty.dept} onChange={(e) => setFilters(prev => ({ ...prev, faculty: { ...prev.faculty, dept: e.target.value } }))} className="block w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none shadow-sm">
+                                    {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                                <div className="relative group">
+                                    <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+                                    <div className="relative bg-white rounded-xl shadow-sm flex items-center border border-slate-200">
+                                        <i className="fas fa-search absolute left-4 text-slate-400"></i>
+                                        <input type="text" className="block w-full pl-12 pr-4 py-4 bg-transparent border-none focus:ring-0 text-slate-800 placeholder-slate-400" placeholder="Find a Professor..." onInput={(e) => setFilters(prev => ({ ...prev, faculty: { ...prev.faculty, search: e.target.value } }))} />
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                            {teachers.filter(t => t.name.toLowerCase().includes(filters.faculty.search.toLowerCase()))
+                            {teachers.filter(t => t.name.toLowerCase().includes(filters.faculty.search.toLowerCase()) && (!filters.faculty.dept || t.dept === filters.faculty.dept))
                             .sort((a, b) => {
                                 const designationRank = {
                                     "Chairman": 1,
