@@ -75,7 +75,7 @@ const COURSE_DB = [
 ];
 
 const DEPARTMENTS = [
-    'Business Administration', 'Pharmacy', 'Microbiology', 'Environmental Science', 'English', 'Economics', 'Film and Media Studies', 'Journalism and Media Studies', 'Public Administration', 'Law', 'Computer Science & Engineering', 'Electrical & Electronic Engineering', 'Civil Engineering', 'Architecture'
+    'Business Administration', 'Pharmacy', 'Microbiology', 'Environmental Science', 'English', 'Economics', 'Film and Media Studies', 'Journalism and Media Studies', 'Public Administration', 'Law', 'Computer Science & Engineering', 'Electrical & Electronic Engineering', 'Civil Engineering', 'Architecture', 'Visiting Faculty'
 ];
 
 export default function QVaultApp() {
@@ -383,14 +383,34 @@ export default function QVaultApp() {
 
         try {
             console.log('Uploading file:', fileToUpload.name, 'Size:', fileToUpload.size, 'bytes');
-            const fd = new FormData();
-            fd.append('reqtype', 'fileupload');
-            fd.append('fileToUpload', fileToUpload);
-            const res = await fetch('https://corsproxy.io/?' + encodeURIComponent('https://catbox.moe/user/api.php'), { method: 'POST', body: fd });
-            const url = await res.text();
-            console.log('Upload response:', url);
             
-            if (!url.startsWith('http')) throw new Error('Upload failed: ' + url);
+            // Generate unique filename
+            const timestamp = Date.now();
+            const randomStr = Math.random().toString(36).substring(2, 8);
+            const fileName = `${uploadType}_${timestamp}_${randomStr}.pdf`;
+            const filePath = `uploads/${fileName}`;
+            
+            // Upload to Supabase Storage
+            console.log('Uploading to Supabase Storage...');
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('qvault-files')
+                .upload(filePath, fileToUpload, {
+                    cacheControl: '3600',
+                    upsert: false
+                });
+            
+            if (uploadError) {
+                console.error('Supabase upload error:', uploadError);
+                throw new Error('Upload failed: ' + uploadError.message);
+            }
+            
+            // Get public URL
+            const { data: urlData } = supabase.storage
+                .from('qvault-files')
+                .getPublicUrl(filePath);
+            
+            const url = urlData.publicUrl;
+            console.log('File uploaded successfully:', url);
 
             const commonData = {
                 courseCode: uploadFormData.code,
@@ -398,7 +418,7 @@ export default function QVaultApp() {
                 semester: `${uploadFormData.semSeason} ${uploadFormData.semYear}`,
                 dept: uploadFormData.dept,
                 teacherId: uploadFormData.teacherId,
-                fileUrl: url.trim()
+                fileUrl: url
             };
 
             if (uploadType === 'paper') {
