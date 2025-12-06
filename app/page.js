@@ -85,8 +85,10 @@ export default function QVaultApp() {
     const [teachers, setTeachers] = useState([]);
     const [papers, setPapers] = useState([]);
     const [materials, setMaterials] = useState([]);
+    const [thesisPapers, setThesisPapers] = useState([]);
     const [pendingPapers, setPendingPapers] = useState([]);
     const [pendingMaterials, setPendingMaterials] = useState([]);
+    const [pendingThesis, setPendingThesis] = useState([]);
     const [user, setUser] = useState(null); // 'admin' or null
     const [deferredPrompt, setDeferredPrompt] = useState(null);
     const [showInstallModal, setShowInstallModal] = useState(false);
@@ -121,10 +123,18 @@ export default function QVaultApp() {
         code: '',
         name: '',
         exam: 'Mid',
-        teacherId: 'Additional'
+        teacherId: 'Additional',
+        thesisTitle: '', author: '', studentId: '', supervisorId: 'Additional', abstract: ''
     });
     const [uploadFile, setUploadFile] = useState(null);
     const [selectedImages, setSelectedImages] = useState([]);
+
+    // Searchable Dropdown States
+    const [teacherSearch, setTeacherSearch] = useState('');
+    const [showTeacherDropdown, setShowTeacherDropdown] = useState(false);
+    const [supervisorSearch, setSupervisorSearch] = useState('');
+    const [showSupervisorDropdown, setShowSupervisorDropdown] = useState(false);
+
     const [isConvertingToPDF, setIsConvertingToPDF] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
 
@@ -134,7 +144,8 @@ export default function QVaultApp() {
         materials: { search: '', dept: '', semSeason: '', semYear: '', teacher: '', course: '', type: '' },
         faculty: { search: '', dept: 'Computer Science & Engineering' },
         adminPaper: { search: '' },
-        adminMaterial: { search: '' }
+        adminMaterial: { search: '' },
+        adminThesis: { search: '' }
     });
 
     // Toast State
@@ -163,6 +174,8 @@ export default function QVaultApp() {
             { name: 'pending_papers', setter: setPendingPapers },
             { name: 'materials', setter: setMaterials },
             { name: 'pending_materials', setter: setPendingMaterials },
+            { name: 'thesis_papers', setter: setThesisPapers },
+            { name: 'pending_thesis_papers', setter: setPendingThesis },
         ];
 
         tables.forEach(t => fetchData(t.name, t.setter));
@@ -412,21 +425,37 @@ export default function QVaultApp() {
             const url = urlData.publicUrl;
             console.log('File uploaded successfully:', url);
 
-            const commonData = {
-                courseCode: uploadFormData.code,
-                courseName: uploadFormData.name,
-                semester: `${uploadFormData.semSeason} ${uploadFormData.semYear}`,
-                dept: uploadFormData.dept,
-                teacherId: uploadFormData.teacherId,
-                fileUrl: url
-            };
-
-            if (uploadType === 'paper') {
-                const { error } = await supabase.from('pending_papers').insert({ ...commonData, exam: uploadFormData.exam, type: uploadFormData.type });
+            if (uploadType === 'thesis') {
+                const thesisData = {
+                    title: uploadFormData.thesisTitle,
+                    author: uploadFormData.author,
+                    studentid: uploadFormData.studentId,
+                    dept: uploadFormData.dept,
+                    year: parseInt(uploadFormData.semYear),
+                    semester: uploadFormData.semSeason,
+                    supervisorid: uploadFormData.supervisorId,
+                    abstract: uploadFormData.abstract,
+                    fileurl: url
+                };
+                const { error } = await supabase.from('pending_thesis_papers').insert(thesisData);
                 if (error) throw error;
             } else {
-                const { error } = await supabase.from('pending_materials').insert({ ...commonData, type: uploadFormData.matType });
-                if (error) throw error;
+                const commonData = {
+                    courseCode: uploadFormData.code,
+                    courseName: uploadFormData.name,
+                    semester: `${uploadFormData.semSeason} ${uploadFormData.semYear}`,
+                    dept: uploadFormData.dept,
+                    teacherId: uploadFormData.teacherId,
+                    fileUrl: url
+                };
+
+                if (uploadType === 'paper') {
+                    const { error } = await supabase.from('pending_papers').insert({ ...commonData, exam: uploadFormData.exam, type: uploadFormData.type });
+                    if (error) throw error;
+                } else {
+                    const { error } = await supabase.from('pending_materials').insert({ ...commonData, type: uploadFormData.matType });
+                    if (error) throw error;
+                }
             }
 
             showToast('Success', 'Submitted for approval', 'success');
@@ -458,20 +487,40 @@ export default function QVaultApp() {
     const approveItem = async (item, type) => {
         if (!supabase) return;
         
-        // Explicitly construct payload to avoid schema mismatch
-        const payload = {
-            courseCode: item.courseCode,
-            courseName: item.courseName,
-            semester: item.semester,
-            dept: item.dept,
-            teacherId: item.teacherId,
-            fileUrl: item.fileUrl,
-            ...(type === 'paper' ? { exam: item.exam, type: item.type } : { type: item.type })
-        };
+        let payload = {};
+        let targetTable = '';
+        let sourceTable = '';
 
-        const targetTable = type === 'paper' ? 'papers' : 'materials';
-        const sourceTable = type === 'paper' ? 'pending_papers' : 'pending_materials';
-        
+        if (type === 'thesis') {
+            payload = {
+                title: item.title,
+                author: item.author,
+                studentid: item.studentid || item.studentId,
+                dept: item.dept,
+                year: item.year,
+                semester: item.semester,
+                supervisorid: item.supervisorid || item.supervisorId,
+                abstract: item.abstract,
+                fileurl: item.fileurl || item.fileUrl
+            };
+            targetTable = 'thesis_papers';
+            sourceTable = 'pending_thesis_papers';
+        } else {
+            // Explicitly construct payload to avoid schema mismatch
+            payload = {
+                courseCode: item.courseCode,
+                courseName: item.courseName,
+                semester: item.semester,
+                dept: item.dept,
+                teacherId: item.teacherId,
+                fileUrl: item.fileUrl,
+                ...(type === 'paper' ? { exam: item.exam, type: item.type } : { type: item.type })
+            };
+            targetTable = 'papers';
+            sourceTable = type === 'paper' ? 'pending_papers' : 'pending_materials';
+            if (type === 'material') targetTable = 'materials';
+        }
+
         const { error: insertError } = await supabase.from(targetTable).insert(payload);
         if (insertError) {
             console.error('Approve Insert Error:', insertError);
@@ -491,8 +540,10 @@ export default function QVaultApp() {
             // Manually update local state
             if (type === 'paper') {
                 setPendingPapers(prev => prev.filter(i => i.id !== item.id));
-            } else {
+            } else if (type === 'material') {
                 setPendingMaterials(prev => prev.filter(i => i.id !== item.id));
+            } else if (type === 'thesis') {
+                setPendingThesis(prev => prev.filter(i => i.id !== item.id));
             }
             showToast('Approved', 'Item added to database');
         }
@@ -501,23 +552,28 @@ export default function QVaultApp() {
     const rejectItem = async (id, type) => {
         if (!supabase) return;
         if (!confirm('Reject this item?')) return;
-        const table = type === 'paper' ? 'pending_papers' : 'pending_materials';
         
-        const { error, data } = await supabase.from(table).delete().eq('id', id).select();
+        // Optimistic Update
+        if (type === 'paper') {
+            setPendingPapers(prev => prev.filter(i => i.id !== id));
+        } else if (type === 'material') {
+            setPendingMaterials(prev => prev.filter(i => i.id !== id));
+        } else if (type === 'thesis') {
+            setPendingThesis(prev => prev.filter(i => i.id !== id));
+        }
+
+        let table = '';
+        if (type === 'paper') table = 'pending_papers';
+        else if (type === 'material') table = 'pending_materials';
+        else if (type === 'thesis') table = 'pending_thesis_papers';
+        
+        const { error } = await supabase.from(table).delete().eq('id', id);
         
         if (error) {
             console.error('Reject Error:', error);
             showToast('Error', 'Reject failed: ' + error.message, 'error');
-        } else if (!data || data.length === 0) {
-            console.error('Reject Failed: No rows deleted');
-            showToast('Error', 'Permission Denied: Could not delete item. Run SQL Fix.', 'error');
+            // Revert state if needed (omitted for simplicity, but recommended for production)
         } else {
-            // Manually update local state
-            if (type === 'paper') {
-                setPendingPapers(prev => prev.filter(i => i.id !== id));
-            } else {
-                setPendingMaterials(prev => prev.filter(i => i.id !== id));
-            }
             showToast('Rejected', 'Item removed');
         }
     };
@@ -526,23 +582,23 @@ export default function QVaultApp() {
         if (!supabase) return;
         if (!confirm('Delete permanently?')) return;
         
-        const { error, data } = await supabase.from(table).delete().eq('id', id).select();
+        // Optimistic Update
+        if (table === 'papers') {
+            setPapers(prev => prev.filter(i => i.id !== id));
+        } else if (table === 'materials') {
+            setMaterials(prev => prev.filter(i => i.id !== id));
+        } else if (table === 'teachers') {
+            setTeachers(prev => prev.filter(i => i.id !== id));
+        } else if (table === 'thesis_papers') {
+            setThesisPapers(prev => prev.filter(i => i.id !== id));
+        }
+
+        const { error } = await supabase.from(table).delete().eq('id', id);
         
         if (error) {
             console.error('Delete Error:', error);
             showToast('Error', 'Delete failed: ' + error.message, 'error');
-        } else if (!data || data.length === 0) {
-            console.error('Delete Failed: No rows deleted');
-            showToast('Error', 'Permission Denied: Could not delete item. Run SQL Fix.', 'error');
         } else {
-            // Manually update local state
-            if (table === 'papers') {
-                setPapers(prev => prev.filter(i => i.id !== id));
-            } else if (table === 'materials') {
-                setMaterials(prev => prev.filter(i => i.id !== id));
-            } else if (table === 'teachers') {
-                setTeachers(prev => prev.filter(i => i.id !== id));
-            }
             showToast('Deleted', 'Item removed permanently');
         }
     };
@@ -609,7 +665,7 @@ export default function QVaultApp() {
                         </div>
                         <div className="hidden md:flex md:items-center md:space-x-2">
                             <div className="flex items-center bg-slate-100/50 rounded-full p-1 border border-slate-200/50 mr-4">
-                                {['vault', 'materials', 'faculty'].map(v => (
+                                {['vault', 'materials', 'thesis', 'faculty'].map(v => (
                                     <a key={v} href="#" onClick={(e) => { e.preventDefault(); navigate(v); }} className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${view === v ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-indigo-600 hover:bg-white'}`}>
                                         {v.charAt(0).toUpperCase() + v.slice(1)}
                                     </a>
@@ -658,6 +714,7 @@ export default function QVaultApp() {
                                             <button onClick={() => navigate('vault')} className="px-5 py-2.5 rounded-xl font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-colors text-sm">Question Bank</button>
                                             <button onClick={() => navigate('course-list')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Course List</button>
                                             <button onClick={() => navigate('materials')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Materials</button>
+                                            <button onClick={() => navigate('thesis')} className="px-5 py-2.5 rounded-xl font-medium text-purple-700 bg-purple-50 border border-purple-100 hover:bg-purple-100 transition-colors text-sm">Thesis</button>
                                             <button onClick={() => navigate('faculty')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Faculty</button>
                                         </div>
 
@@ -871,6 +928,36 @@ export default function QVaultApp() {
                     </div>
                 )}
 
+                {/* THESIS VIEW */}
+                {view === 'thesis' && (
+                    <div className="h-full flex flex-col bg-slate-50 p-6 lg:p-10 overflow-y-auto">
+                        <div className="mb-6 flex flex-wrap gap-4 justify-between items-end">
+                            <div><h3 className="text-2xl font-bold text-slate-900">Thesis Papers</h3><p className="text-sm text-slate-500 mt-1">Browse submitted thesis papers</p></div>
+                            <span className="bg-purple-100 text-purple-700 text-xs font-bold px-3 py-1 rounded-full">{thesisPapers.length} papers</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                            {thesisPapers.length === 0 ? (
+                                <div className="col-span-full py-20 text-center"><p className="text-slate-400 text-sm">No thesis papers uploaded yet. Click the Upload button to add one.</p></div>
+                            ) : thesisPapers.map(t => (
+                                <div key={t.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 hover:translate-y-[-4px] transition-transform duration-300 flex flex-col overflow-hidden">
+                                    <div className="p-6 flex-1">
+                                        <div className="flex justify-between items-start mb-3"><span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-purple-100 text-purple-700">{t.year || 'N/A'}</span><span className="text-xs text-slate-500">{t.dept}</span></div>
+                                        <h4 className="text-lg font-bold text-slate-900 leading-tight mb-3 line-clamp-2">{t.title}</h4>
+                                        <div className="flex items-center gap-2 mb-2"><i className="fas fa-user text-slate-400 text-xs"></i><span className="text-sm text-slate-600">{t.author}</span></div>
+                                        <div className="flex items-center gap-2 mb-2"><i className="fas fa-id-card text-slate-400 text-xs"></i><span className="text-xs text-slate-500">Student ID: {t.studentid || t.studentId || 'N/A'}</span></div>
+                                        <div className="flex items-center gap-2 mb-2"><i className="fas fa-user-tie text-slate-400 text-xs"></i><span className="text-xs text-slate-500">Supervisor: {getTeacherName(t.supervisorid || t.supervisorId)}</span></div>
+                                        {t.abstract && <p className="text-xs text-slate-500 line-clamp-2 mt-3 italic">{t.abstract}</p>}
+                                    </div>
+                                    <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex justify-between items-center">
+                                        <button onClick={() => { setPreviewUrl(t.fileurl || t.fileUrl); setShowPreviewModal(true); }} className="text-sm text-purple-600 hover:text-purple-800 font-semibold flex items-center gap-2"><i className="fas fa-eye"></i> Preview</button>
+                                        <button onClick={() => window.open(t.fileurl || t.fileUrl, '_blank')} className="text-slate-400 hover:text-slate-600"><i className="fas fa-download"></i></button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* FACULTY VIEW */}
                 {view === 'faculty' && (
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -1012,14 +1099,23 @@ export default function QVaultApp() {
                         <div className="flex justify-between items-center mb-8">
                             <div><h2 className="text-3xl font-extrabold text-slate-900">Admin Dashboard</h2><p className="text-slate-500 mt-1">Manage content and faculty.</p></div>
                             <div className="flex gap-3">
+                                <button onClick={() => window.location.reload()} className="text-slate-600 hover:text-slate-800 font-bold text-sm bg-slate-100 px-4 py-2 rounded-xl transition-colors"><i className="fas fa-sync-alt mr-2"></i>Refresh</button>
                                 <button onClick={() => setView('home')} className="text-indigo-600 hover:text-indigo-800 font-bold text-sm bg-indigo-50 px-4 py-2 rounded-xl transition-colors">Home</button>
                                 <button onClick={() => { setUser(null); setView('home'); }} className="text-red-500 hover:text-red-700 font-bold text-sm bg-red-50 px-4 py-2 rounded-xl transition-colors">Logout</button>
                             </div>
                         </div>
                         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden flex flex-col flex-1">
                             <div className="flex border-b border-slate-200 overflow-x-auto">
-                                {['uploads', 'mat_uploads', 'papers', 'materials', 'faculty'].map(tab => {
-                                    const names = { uploads: 'Pending Questions', mat_uploads: 'Pending Materials', papers: 'Questions', materials: 'Materials', faculty: 'Faculty' };
+                                {['uploads', 'mat_uploads', 'thesis_uploads', 'papers', 'materials', 'thesis', 'faculty'].map(tab => {
+                                    const names = { 
+                                        uploads: 'Pending Questions', 
+                                        mat_uploads: 'Pending Materials', 
+                                        thesis_uploads: 'Pending Thesis',
+                                        papers: 'Questions', 
+                                        materials: 'Materials', 
+                                        thesis: 'Thesis',
+                                        faculty: 'Faculty' 
+                                    };
                                     return (
                                         <button key={tab} onClick={() => setAdminTab(tab)} className={`flex-1 py-4 text-sm font-bold uppercase tracking-wide transition-all whitespace-nowrap px-4 ${adminTab === tab ? 'bg-indigo-50 text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>{names[tab]}</button>
                                     );
@@ -1070,6 +1166,33 @@ export default function QVaultApp() {
                                                     <div className="flex gap-2">
                                                         <button onClick={() => approveItem(item, 'material')} className="bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-600 shadow-sm">Approve</button>
                                                         <button onClick={() => rejectItem(item.id, 'material')} className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-600 shadow-sm">Reject</button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* THESIS_UPLOADS TAB (Pending Thesis) */}
+                            {adminTab === 'thesis_uploads' && (
+                                <div className="flex-1 overflow-y-auto p-6">
+                                    <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><i className="fas fa-clock text-amber-500"></i> Pending Thesis Approvals</h3>
+                                    {pendingThesis.length === 0 ? (
+                                        <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-400 text-sm">No pending thesis papers.</div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {pendingThesis.map(t => ({...t, _type: 'thesis'})).map(item => (
+                                                <div key={item.id} className="flex items-center justify-between p-4 bg-amber-50 border border-amber-100 rounded-xl">
+                                                    <div>
+                                                        <div className="font-bold text-slate-800 text-sm"><span className="uppercase text-[10px] bg-white border border-amber-200 px-1.5 py-0.5 rounded text-amber-600 mr-2 font-extrabold tracking-wider">THESIS</span> {item.title}</div>
+                                                        <div className="text-xs text-slate-500 mt-1">{item.dept} • {item.year} • {item.author}</div>
+                                                        <div className="text-xs text-slate-500">Supervisor: {getTeacherName(item.supervisorid || item.supervisorId)}</div>
+                                                        <a href={item.fileurl || item.fileUrl} target="_blank" className="text-xs text-indigo-600 hover:underline mt-1 block">View File</a>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => approveItem(item, 'thesis')} className="bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-600 shadow-sm">Approve</button>
+                                                        <button onClick={() => rejectItem(item.id, 'thesis')} className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-600 shadow-sm">Reject</button>
                                                     </div>
                                                 </div>
                                             ))}
@@ -1138,6 +1261,43 @@ export default function QVaultApp() {
                                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"><button onClick={() => deleteItem(item.id, 'materials')} className="text-red-400 hover:text-red-600"><i className="fas fa-trash-alt"></i></button></td>
                                                     </tr>
                                                 ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* THESIS TAB */}
+                            {adminTab === 'thesis' && (
+                                <div className="flex-1 overflow-y-auto p-6">
+                                    <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><i className="fas fa-database text-indigo-500"></i> Manage Thesis Papers</h3>
+                                    <div className="flex gap-4 mb-4">
+                                        <input placeholder="Search thesis..." value={filters.adminThesis?.search || ''} className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none" onChange={e => setFilters(prev => ({ ...prev, adminThesis: { search: e.target.value } }))} />
+                                    </div>
+                                    <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                                        <table className="min-w-full divide-y divide-slate-200">
+                                            <thead className="bg-slate-100">
+                                                <tr>
+                                                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Title / Author</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Dept / Year</th>
+                                                    <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-white divide-y divide-slate-100">
+                                                {thesisPapers
+                                                .filter(i => !filters.adminThesis?.search || i.title.toLowerCase().includes(filters.adminThesis.search.toLowerCase()) || i.author.toLowerCase().includes(filters.adminThesis.search.toLowerCase()))
+                                                .slice(0, 50)
+                                                .map(item => {
+                                                    console.log('Thesis Item:', item);
+                                                    console.log('Teachers Count:', teachers.length);
+                                                    return (
+                                                    <tr key={item.id} className="hover:bg-slate-50">
+                                                        <td className="px-6 py-4 whitespace-nowrap"><div className="text-sm font-bold text-slate-900 truncate max-w-xs" title={item.title}>{item.title}</div><div className="text-xs text-slate-500">{item.author}</div></td>
+                                                        <td className="px-6 py-4 whitespace-nowrap"><div className="text-sm text-slate-900">{item.dept}</div><div className="text-xs text-slate-500">{item.year} • {getTeacherName(item.supervisorid || item.supervisorId)}</div></td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"><button onClick={() => deleteItem(item.id, 'thesis_papers')} className="text-red-400 hover:text-red-600"><i className="fas fa-trash-alt"></i></button></td>
+                                                    </tr>
+                                                    );
+                                                })}
                                             </tbody>
                                         </table>
                                     </div>
@@ -1220,68 +1380,166 @@ export default function QVaultApp() {
                             <div className="bg-white -mt-8 mx-4 mb-4 rounded-xl shadow-lg px-8 py-8 relative">
                                 <div className="flex justify-center mb-8">
                                     <div className="bg-slate-100 p-1.5 rounded-xl inline-flex shadow-inner">
-                                        <button onClick={() => { setUploadType('paper'); setUploadFormData(p => ({ ...p, matType: 'slide' })); updateCourseOptions('theory'); }} className={`px-8 py-2.5 rounded-lg text-sm font-bold transition-all ${uploadType === 'paper' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Question Paper</button>
-                                        <button onClick={() => { setUploadType('material'); setUploadFormData(p => ({ ...p, matType: 'book' })); updateCourseOptions('theory'); }} className={`px-8 py-2.5 rounded-lg text-sm font-bold transition-all ${uploadType === 'material' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Course Material</button>
+                                        <button onClick={() => { setUploadType('paper'); setUploadFormData(p => ({ ...p, matType: 'slide' })); updateCourseOptions('theory'); }} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${uploadType === 'paper' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Question Paper</button>
+                                        <button onClick={() => { setUploadType('material'); setUploadFormData(p => ({ ...p, matType: 'book' })); updateCourseOptions('theory'); }} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${uploadType === 'material' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Course Material</button>
+                                        <button onClick={() => { setUploadType('thesis'); }} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${uploadType === 'thesis' ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Thesis Paper</button>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                    <div className="space-y-5">
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Department</label>
-                                            <div className="relative"><select value={uploadFormData.dept} onChange={e => handleUploadChange('dept', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none appearance-none">{DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}</select><i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Semester & Year</label>
-                                            <div className="flex gap-3">
-                                                <div className="relative w-1/2"><select value={uploadFormData.semSeason} onChange={e => handleUploadChange('semSeason', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option>Fall</option><option>Summer</option><option>Spring</option></select><i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
-                                                <div className="relative w-1/2"><select value={uploadFormData.semYear} onChange={e => handleUploadChange('semYear', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none">{Array.from({ length: 11 }, (_, i) => 2020 + i).map(y => <option key={y}>{y}</option>)}</select><i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
+                                    {uploadType === 'thesis' ? (
+                                        <>
+                                            <div className="space-y-5">
+                                                <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Thesis Title *</label><input value={uploadFormData.thesisTitle || ''} onChange={e => handleUploadChange('thesisTitle', e.target.value)} placeholder="Enter thesis title" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none" /></div>
+                                                <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Author Name *</label><input value={uploadFormData.author || ''} onChange={e => handleUploadChange('author', e.target.value)} placeholder="Student full name" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none" /></div>
+                                                <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Student ID *</label><input value={uploadFormData.studentId || ''} onChange={e => handleUploadChange('studentId', e.target.value)} placeholder="e.g. CSE12345678" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none" /></div>
+                                                <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Department *</label><div className="relative"><select value={uploadFormData.dept} onChange={e => handleUploadChange('dept', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none appearance-none">{DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}</select><i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div></div>
                                             </div>
-                                        </div>
-                                        {uploadType === 'paper' ? (
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Course Type</label>
-                                                <div className="relative"><select value={uploadFormData.type} onChange={e => handleUploadChange('type', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option value="theory">Theory</option><option value="lab">Lab</option></select><i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
+                                            <div className="space-y-5">
+                                                <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Year / Semester</label><div className="flex gap-3"><div className="relative w-1/2"><select value={uploadFormData.semSeason} onChange={e => handleUploadChange('semSeason', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none appearance-none"><option>Fall</option><option>Summer</option><option>Spring</option></select><i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div><div className="relative w-1/2"><select value={uploadFormData.semYear} onChange={e => handleUploadChange('semYear', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none appearance-none">{Array.from({ length: 11 }, (_, i) => 2020 + i).map(y => <option key={y}>{y}</option>)}</select><i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div></div></div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Supervisor *</label>
+                                                    <div className="relative">
+                                                        {showSupervisorDropdown && <div className="fixed inset-0 z-10" onClick={() => setShowSupervisorDropdown(false)}></div>}
+                                                        <input
+                                                            type="text"
+                                                            value={supervisorSearch}
+                                                            onChange={(e) => {
+                                                                setSupervisorSearch(e.target.value);
+                                                                setShowSupervisorDropdown(true);
+                                                            }}
+                                                            onFocus={() => setShowSupervisorDropdown(true)}
+                                                            placeholder={uploadFormData.supervisorId === 'Additional' ? "Select Supervisor..." : getTeacherName(uploadFormData.supervisorId)}
+                                                            className="block w-full pl-4 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none relative z-20"
+                                                        />
+                                                        {showSupervisorDropdown && (
+                                                            <div className="absolute z-30 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-auto">
+                                                                <div 
+                                                                    className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm"
+                                                                    onClick={() => {
+                                                                        handleUploadChange('supervisorId', 'Additional');
+                                                                        setSupervisorSearch('Additional');
+                                                                        setShowSupervisorDropdown(false);
+                                                                    }}
+                                                                >
+                                                                    Additional
+                                                                </div>
+                                                                {teachers.filter(t => t.name.toLowerCase().includes(supervisorSearch.toLowerCase())).map(t => (
+                                                                    <div 
+                                                                        key={t.id} 
+                                                                        className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm"
+                                                                        onClick={() => {
+                                                                            handleUploadChange('supervisorId', t.id);
+                                                                            setSupervisorSearch(t.name);
+                                                                            setShowSupervisorDropdown(false);
+                                                                        }}
+                                                                    >
+                                                                        {t.name}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        <i className="fas fa-search absolute right-4 top-4 text-slate-400 text-xs pointer-events-none z-20"></i>
+                                                    </div>
+                                                </div>
+                                                <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Abstract / Description</label><textarea value={uploadFormData.abstract || ''} onChange={e => handleUploadChange('abstract', e.target.value)} placeholder="Brief description of the thesis..." rows="4" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none resize-none" /></div>
                                             </div>
-                                        ) : (
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Material Type</label>
-                                                <div className="relative"><select value={uploadFormData.matType} onChange={e => handleUploadChange('matType', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option value="slide">Slide/Presentation</option><option value="book">Book/PDF</option><option value="note">Class Note</option></select><i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="space-y-5">
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Code</label>
-                                            <div className="relative">
-                                                <select value={uploadFormData.code} onChange={e => handleUploadChange('code', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none">
-                                                    {COURSE_DB.filter(c => uploadType === 'material' || c.type === uploadFormData.type).sort((a, b) => a.code.localeCompare(b.code)).map(c => <option key={c.code} value={c.code}>{c.code} - {c.name}</option>)}
-                                                </select>
-                                                <i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">{uploadType === 'paper' ? 'Course Name' : 'Book / Slide'}</label>
-                                            <input value={uploadFormData.name} onChange={e => handleUploadChange('name', e.target.value)} placeholder="Introduction to CS" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">{uploadType === 'paper' ? 'Details' : 'Faculty'}</label>
-                                            <div className="flex gap-3">
-                                                {uploadType === 'paper' && (
-                                                    <div className="relative w-1/2">
-                                                        <select value={uploadFormData.exam} onChange={e => handleUploadChange('exam', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option>Mid</option><option>Final</option></select>
-                                                        <i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="space-y-5">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Department</label>
+                                                    <div className="relative"><select value={uploadFormData.dept} onChange={e => handleUploadChange('dept', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none appearance-none">{DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}</select><i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Semester & Year</label>
+                                                    <div className="flex gap-3">
+                                                        <div className="relative w-1/2"><select value={uploadFormData.semSeason} onChange={e => handleUploadChange('semSeason', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option>Fall</option><option>Summer</option><option>Spring</option></select><i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
+                                                        <div className="relative w-1/2"><select value={uploadFormData.semYear} onChange={e => handleUploadChange('semYear', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none">{Array.from({ length: 11 }, (_, i) => 2020 + i).map(y => <option key={y}>{y}</option>)}</select><i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
+                                                    </div>
+                                                </div>
+                                                {uploadType === 'paper' ? (
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Course Type</label>
+                                                        <div className="relative"><select value={uploadFormData.type} onChange={e => handleUploadChange('type', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option value="theory">Theory</option><option value="lab">Lab</option></select><i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
+                                                    </div>
+                                                ) : (
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Material Type</label>
+                                                        <div className="relative"><select value={uploadFormData.matType} onChange={e => handleUploadChange('matType', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option value="slide">Slide/Presentation</option><option value="book">Book/PDF</option><option value="note">Class Note</option></select><i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
                                                     </div>
                                                 )}
-                                                <div className={`relative ${uploadType === 'paper' ? 'w-1/2 flex-1' : 'w-full'}`}>
-                                                    <select value={uploadFormData.teacherId} onChange={e => handleUploadChange('teacherId', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none">
-                                                        <option value="Additional">Additional</option>
-                                                        {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                                                    </select>
-                                                    <i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i>
+                                            </div>
+                                            <div className="space-y-5">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Code</label>
+                                                    <div className="relative">
+                                                        <select value={uploadFormData.code} onChange={e => handleUploadChange('code', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none">
+                                                            {COURSE_DB.filter(c => uploadType === 'material' || c.type === uploadFormData.type).sort((a, b) => a.code.localeCompare(b.code)).map(c => <option key={c.code} value={c.code}>{c.code} - {c.name}</option>)}
+                                                        </select>
+                                                        <i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">{uploadType === 'paper' ? 'Course Name' : 'Book / Slide'}</label>
+                                                    <input value={uploadFormData.name} onChange={e => handleUploadChange('name', e.target.value)} placeholder="Introduction to CS" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">{uploadType === 'paper' ? 'Details' : 'Faculty'}</label>
+                                                    <div className="flex gap-3">
+                                                        {uploadType === 'paper' && (
+                                                            <div className="relative w-1/2">
+                                                                <select value={uploadFormData.exam} onChange={e => handleUploadChange('exam', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option>Mid</option><option>Final</option></select>
+                                                                <i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i>
+                                                            </div>
+                                                        )}
+                                                        <div className={`relative ${uploadType === 'paper' ? 'w-1/2 flex-1' : 'w-full'}`}>
+                                                            {showTeacherDropdown && <div className="fixed inset-0 z-10" onClick={() => setShowTeacherDropdown(false)}></div>}
+                                                            <input
+                                                                type="text"
+                                                                value={teacherSearch}
+                                                                onChange={(e) => {
+                                                                    setTeacherSearch(e.target.value);
+                                                                    setShowTeacherDropdown(true);
+                                                                }}
+                                                                onFocus={() => setShowTeacherDropdown(true)}
+                                                                placeholder={uploadFormData.teacherId === 'Additional' ? "Search Faculty..." : getTeacherName(uploadFormData.teacherId)}
+                                                                className="block w-full pl-4 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none relative z-20"
+                                                            />
+                                                            {showTeacherDropdown && (
+                                                                <div className="absolute z-30 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-auto">
+                                                                    <div 
+                                                                        className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm"
+                                                                        onClick={() => {
+                                                                            handleUploadChange('teacherId', 'Additional');
+                                                                            setTeacherSearch('Additional');
+                                                                            setShowTeacherDropdown(false);
+                                                                        }}
+                                                                    >
+                                                                        Additional
+                                                                    </div>
+                                                                    {teachers.filter(t => t.name.toLowerCase().includes(teacherSearch.toLowerCase())).map(t => (
+                                                                        <div 
+                                                                            key={t.id} 
+                                                                            className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm"
+                                                                            onClick={() => {
+                                                                                handleUploadChange('teacherId', t.id);
+                                                                                setTeacherSearch(t.name);
+                                                                                setShowTeacherDropdown(false);
+                                                                            }}
+                                                                        >
+                                                                            {t.name}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                            <i className="fas fa-search absolute right-4 top-4 text-slate-400 text-xs pointer-events-none z-20"></i>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </div>
+                                        </>
+                                    )}
                                     <div className="sm:col-span-2 mt-2">
                                         <div className="border-2 border-dashed border-slate-300 rounded-2xl px-6 py-10 text-center hover:bg-indigo-50 hover:border-indigo-300 transition-all bg-slate-50 cursor-pointer relative group">
                                             <input 

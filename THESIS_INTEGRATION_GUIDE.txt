@@ -1,0 +1,94 @@
+// THESIS FEATURE - MANUAL INTEGRATION GUIDE
+// Follow these steps to add the thesis feature to app/page.js
+
+// ========== STEP 1: ADD STATE VARIABLES (around line 88) ==========
+// Add these after the "const [materials, setMaterials] = useState([]);" line:
+
+const [thesisPapers, setThesisPapers] = useState([]);
+const [pendingThesis, setPendingThesis] = useState([]);
+
+// ========== STEP 2: EXTEND uploadFormData (around line 126) ==========
+// Add these fields inside uploadFormData state object, after teacherId:
+
+        // Thesis-specific fields
+        thesisTitle: '',
+        author: '',
+        studentId: '',
+        supervisorId: 'Additional',
+        abstract: ''
+
+// ========== STEP 3: ADD THESIS FILTER (around line 137) ==========
+// Add this line in the filters state object:
+
+        thesis: { search: '', dept: '', year: '', supervisor: '' },
+
+// ========== STEP 4: ADD THESIS TABLES TO DATA FETCHING (around line 174) ==========
+// Add these two lines to the tables array, after pending_materials:
+
+            { name: 'thesis_papers', setter: setThesisPapers },
+            { name: 'pending_thesis_papers', setter: setPendingThesis },
+
+// ========== STEP 5: UPDATE NAVIGATION (around line 623) ==========
+// Change this line:
+// ['vault', 'materials', 'faculty'].map(v => (
+// To this:
+['vault', 'materials', 'thesis', 'faculty'].map(v => (
+
+// ========== STEP 6: ADD THESIS UPLOAD HANDLING IN submitUpload (around line 438) ==========
+// Replace the section from "else {" to the closing brace with:
+
+            } else if (uploadType === 'thesis') {
+                // Thesis-specific data
+                const thesisData = {
+                    title: uploadFormData.thesisTitle,
+                    author: uploadFormData.author,
+                    studentId: uploadFormData.studentId,
+                    dept: uploadFormData.dept,
+                    year: parseInt(uploadFormData.semYear),
+                    semester: `${uploadFormData.semSeason} ${uploadFormData.semYear}`,
+                    supervisorId: uploadFormData.supervisorId,
+                    abstract: uploadFormData.abstract,
+                    fileUrl: url
+                };
+                const { error } = await supabase.from('pending_thesis_papers').insert(thesisData);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase.from('pending_materials').insert({ ...commonData, type: uploadFormData.matType });
+                if (error) throw error;
+            }
+
+// ========== STEP 7: ADD THESIS VIEW (Insert this BEFORE the FACULTY VIEW section) ==========
+// Find "{/* FACULTY VIEW */}" and INSERT THIS CODE BEFORE IT:
+
+                {/* THESIS VIEW */}
+                {view === 'thesis' && (
+                    <div className="h-full flex flex-col bg-slate-50 p-6 lg:p-10 overflow-y-auto">
+                        <div className="mb-6">
+                            <div><h3 className="text-2xl font-bold text-slate-900">Thesis Papers</h3><p className="text-sm text-slate-500 mt-1">Browse submitted thesis papers</p></div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                            {thesisPapers.map(t => (
+                                <div key={t.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 hover:translate-y-[-4px] transition-transform duration-300 flex flex-col overflow-hidden">
+                                    <div className="p-6 flex-1">
+                                        <h4 className="text-lg font-bold text-slate-900 leading-tight mb-2">{t.title}</h4>
+                                        <div className="flex items-center gap-2 mb-2"><span className="text-sm text-slate-600">By: {t.author}</span></div>
+                                        <div className="flex items-center gap-2 mb-2"><span className="text-xs text-slate-500">{t.dept} • {t.year}</span></div>
+                                        {t.abstract && <p className="text-xs text-slate-500 line-clamp-3 mt-2">{t.abstract}</p>}
+                                    </div>
+                                    <div className="bg-slate-50/50 px-6 py-4 border-t border-slate-100 flex justify-between items-center">
+                                        <button onClick={() => { setPreviewUrl(t.fileUrl); setShowPreviewModal(true); }} className="text-sm text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-2"><i className="fas fa-eye"></i> Preview</button>
+                                        <button onClick={(e) => { e.stopPropagation(); window.open(t.fileUrl, '_blank'); }} className="text-slate-400 hover:text-slate-600"><i className="fas fa-download"></i></button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+// ========== STEP 8: ADD THESIS TAB TO UPLOAD MODAL (around line 1190) ==========
+// Find the upload modal tab buttons section and add a third button:
+
+                                        <button onClick={() => { setUploadType('thesis'); }} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${uploadType === 'thesis' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Thesis Paper</button>
+
+// ========== DONE! ==========
+// Save the file and the thesis feature should be working!
