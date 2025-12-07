@@ -124,7 +124,8 @@ export default function QVaultApp() {
         name: '',
         exam: 'Mid',
         teacherId: 'Additional',
-        thesisTitle: '', author: '', studentId: '', supervisorId: 'Additional', abstract: ''
+        thesisTitle: '', author: '', studentId: '', supervisorId: 'Additional', abstract: '',
+        thesisType: 'thesis', thesisCategory: '', projectLink: ''
     });
     const [uploadFile, setUploadFile] = useState(null);
     const [selectedImages, setSelectedImages] = useState([]);
@@ -435,7 +436,10 @@ export default function QVaultApp() {
                     semester: uploadFormData.semSeason,
                     supervisorid: uploadFormData.supervisorId,
                     abstract: uploadFormData.abstract,
-                    fileurl: url
+                    fileurl: url,
+                    type: uploadFormData.thesisType,
+                    category: uploadFormData.thesisCategory,
+                    project_link: uploadFormData.projectLink
                 };
                 const { error } = await supabase.from('pending_thesis_papers').insert(thesisData);
                 if (error) throw error;
@@ -501,7 +505,10 @@ export default function QVaultApp() {
                 semester: item.semester,
                 supervisorid: item.supervisorid || item.supervisorId,
                 abstract: item.abstract,
-                fileurl: item.fileurl || item.fileUrl
+                fileurl: item.fileurl || item.fileUrl,
+                type: item.type || 'thesis',
+                category: item.category,
+                project_link: item.project_link || item.projectLink
             };
             targetTable = 'thesis_papers';
             sourceTable = 'pending_thesis_papers';
@@ -946,7 +953,16 @@ export default function QVaultApp() {
                                         <div className="flex items-center gap-2 mb-2"><i className="fas fa-user text-slate-400 text-xs"></i><span className="text-sm text-slate-600">{t.author}</span></div>
                                         <div className="flex items-center gap-2 mb-2"><i className="fas fa-id-card text-slate-400 text-xs"></i><span className="text-xs text-slate-500">Student ID: {t.studentid || t.studentId || 'N/A'}</span></div>
                                         <div className="flex items-center gap-2 mb-2"><i className="fas fa-user-tie text-slate-400 text-xs"></i><span className="text-xs text-slate-500">Supervisor: {getTeacherName(t.supervisorid || t.supervisorId)}</span></div>
-                                        {t.abstract && <p className="text-xs text-slate-500 line-clamp-2 mt-3 italic">{t.abstract}</p>}
+                                        <div className="flex gap-2 mb-3">
+                                            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full text-white ${t.type === 'project' ? 'bg-blue-500' : 'bg-purple-500'}`}>{t.type || 'thesis'}</span>
+                                            {t.category && <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full text-white ${t.category === 'lab' ? 'bg-pink-500' : 'bg-indigo-500'}`}>{t.category}</span>}
+                                        </div>
+                                        {t.abstract && <p className="text-xs text-slate-500 line-clamp-2 mt-2 italic">{t.abstract}</p>}
+                                        {(t.project_link || t.projectLink) && (
+                                            <a href={t.project_link || t.projectLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-600 font-bold mt-2 hover:underline">
+                                                <i className="fas fa-link"></i> View Project
+                                            </a>
+                                        )}
                                     </div>
                                     <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex justify-between items-center">
                                         <button onClick={() => { setPreviewUrl(t.fileurl || t.fileUrl); setShowPreviewModal(true); }} className="text-sm text-purple-600 hover:text-purple-800 font-semibold flex items-center gap-2"><i className="fas fa-eye"></i> Preview</button>
@@ -1442,6 +1458,35 @@ export default function QVaultApp() {
                                                     </div>
                                                 </div>
                                                 <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Abstract / Description</label><textarea value={uploadFormData.abstract || ''} onChange={e => handleUploadChange('abstract', e.target.value)} placeholder="Brief description of the thesis..." rows="4" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none resize-none" /></div>
+                                                
+                                                <div className="flex gap-4">
+                                                    <div className="w-1/2">
+                                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Type</label>
+                                                        <div className="relative">
+                                                            <select value={uploadFormData.thesisType || 'thesis'} onChange={e => handleUploadChange('thesisType', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none appearance-none">
+                                                                <option value="thesis">Thesis</option>
+                                                                <option value="project">Project</option>
+                                                            </select>
+                                                            <i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i>
+                                                        </div>
+                                                    </div>
+                                                    <div className="w-1/2">
+                                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Category</label>
+                                                        <div className="relative">
+                                                            <select value={uploadFormData.thesisCategory || ''} onChange={e => handleUploadChange('thesisCategory', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none appearance-none">
+                                                                <option value="">None</option>
+                                                                <option value="theory">Theory</option>
+                                                                <option value="lab">Lab</option>
+                                                            </select>
+                                                            <i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Project Link (Optional)</label>
+                                                    <input value={uploadFormData.projectLink || ''} onChange={e => handleUploadChange('projectLink', e.target.value)} placeholder="https://github.com/username/repo" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none" />
+                                                </div>
                                             </div>
                                         </>
                                     ) : (
