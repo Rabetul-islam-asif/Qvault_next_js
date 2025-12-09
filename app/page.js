@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import jsPDF from 'jspdf';
+import Papa from 'papaparse';
 
 // --- SUPABASE CONFIGURATION ---
 const SUPABASE_URL = 'https://nfahvsssiokaprylfrxv.supabase.co';
@@ -94,6 +95,21 @@ export default function QVaultApp() {
     const [showInstallModal, setShowInstallModal] = useState(false);
     const [adminTab, setAdminTab] = useState('uploads');
     
+    // Blood Bank State
+    const [bloodDonors, setBloodDonors] = useState([]);
+    const [bloodFilter, setBloodFilter] = useState({
+        group: 'All',
+        dept: 'All',
+        gender: 'All',
+        donorStatus: 'All',
+        willingness: 'All'
+    });
+    const [adminBloodFile, setAdminBloodFile] = useState(null);
+    const [showBloodModal, setShowBloodModal] = useState(false);
+    const [singleBloodForm, setSingleBloodForm] = useState({
+        name: '', department: 'Computer Science & Engineering', batch: '', gender: 'Male', contact: '', blood_group: 'A+', is_donor: false, willingness: 5
+    });
+    
     // Missing State Variables
     const [showUploadModal, setShowUploadModal] = useState(false);
     const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -165,7 +181,8 @@ export default function QVaultApp() {
         if (!supabase) return;
 
         const fetchData = async (table, setter) => {
-            const { data } = await supabase.from(table).select('*');
+            const { data, error } = await supabase.from(table).select('*');
+            if (error) console.error(`Error fetching ${table}:`, error);
             if (data) setter(data);
         };
 
@@ -177,14 +194,19 @@ export default function QVaultApp() {
             { name: 'pending_materials', setter: setPendingMaterials },
             { name: 'thesis_papers', setter: setThesisPapers },
             { name: 'pending_thesis_papers', setter: setPendingThesis },
+            { name: 'blood_donors', setter: setBloodDonors },
         ];
 
+        // Fetch initial data
         tables.forEach(t => fetchData(t.name, t.setter));
 
         // Realtime Subscription
+        console.log('Attempting to subscribe to real-time changes...');
         const channel = supabase.channel('db-changes');
+        
         tables.forEach(t => {
             channel.on('postgres_changes', { event: '*', schema: 'public', table: t.name }, (payload) => {
+                console.log(`Realtime update received for ${t.name}:`, payload.eventType);
                 const { eventType, new: newRow, old: oldRow } = payload;
                 t.setter(prev => {
                     if (eventType === 'INSERT') return [...prev, newRow];
@@ -194,12 +216,24 @@ export default function QVaultApp() {
                 });
             });
         });
-        channel.subscribe();
+
+        channel.subscribe((status) => {
+            console.log(`Supabase Realtime Status: ${status}`);
+            if (status === 'SUBSCRIBED') {
+                showToast('Connected', 'Real-time updates active', 'success');
+            }
+            if (status === 'CHANNEL_ERROR') {
+                console.error('Realtime channel error. Check your network or Supabase project settings.');
+            }
+        });
 
         // Init Upload Form Codes
         updateCourseOptions('theory');
 
-        return () => supabase.removeChannel(channel);
+        return () => {
+             console.log('Cleaning up subscription...');
+             supabase.removeChannel(channel);
+        };
     }, [supabase]);
 
     // 3. PWA Installer Listener
@@ -253,6 +287,68 @@ export default function QVaultApp() {
     const navigate = (newView) => {
         window.history.pushState({ view: newView }, '', `#${newView}`);
         setView(newView);
+    };
+
+    // --- BLOOD BANK LOGIC ---
+    const handleBloodCSVUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        Papa.parse(file, {
+            header: true,
+            complete: async (results) => {
+                console.log('Parsed CSV:', results.data);
+                const donors = results.data.map(row => ({
+                    name: row.Name || row.name,
+                    department: row.Dept || row.Department || row.department,
+                    batch: row.Batch || row.batch,
+                    gender: row.Gender || row.gender,
+                    contact: row.Contact || row.contact,
+                    blood_group: row.BloodGroup || row.blood_group || row['Blood Group'],
+                    is_donor: (row.PreviousDonor || row.is_donor || row['Previous Donor']) === 'Yes' || (row.PreviousDonor || row.is_donor || row['Previous Donor']) === true || (row.PreviousDonor || row.is_donor || row['Previous Donor']) === 'true',
+                    willingness: parseInt(row.Willingness || row.willingness || 5)
+                })).filter(d => d.name && d.blood_group);
+
+                if (donors.length === 0) return showToast('Error', 'No valid rows found', 'error');
+
+                const { error } = await supabase.from('blood_donors').insert(donors);
+                if (error) showToast('Error', error.message, 'error');
+                else {
+                    showToast('Success', `Imported ${donors.length} donors!`);
+                    setAdminBloodFile(null);
+                }
+            },
+            error: (err) => showToast('Error', 'CSV Parse Error', 'error')
+        });
+    };
+
+    const handleSingleBloodAdd = async () => {
+        if (singleBloodForm.id) {
+            // Update existing donor
+            const { error } = await supabase.from('blood_donors').update(singleBloodForm).eq('id', singleBloodForm.id);
+            if (error) showToast('Error', error.message, 'error');
+            else {
+                showToast('Success', 'Donor updated!');
+                setShowBloodModal(false);
+                setSingleBloodForm({ name: '', department: 'Computer Science & Engineering', batch: '', gender: 'Male', contact: '', blood_group: 'A+', is_donor: false, willingness: 5 });
+            }
+        } else {
+            // Add new donor
+            const { error } = await supabase.from('blood_donors').insert(singleBloodForm);
+            if (error) showToast('Error', error.message, 'error');
+            else {
+                showToast('Success', 'Donor added!');
+                setShowBloodModal(false);
+                setSingleBloodForm({ name: '', department: 'Computer Science & Engineering', batch: '', gender: 'Male', contact: '', blood_group: 'A+', is_donor: false, willingness: 5 });
+            }
+        }
+    };
+    
+    const deleteDonor = async (id) => {
+        if(!confirm("Delete this donor?")) return;
+        const { error } = await supabase.from('blood_donors').delete().eq('id', id);
+        if(error) showToast('Error', error.message, 'error');
+        else showToast('Success', 'Donor deleted');
     };
 
     // --- UPLOAD LOGIC ---
@@ -672,9 +768,9 @@ export default function QVaultApp() {
                         </div>
                         <div className="hidden md:flex md:items-center md:space-x-2">
                             <div className="flex items-center bg-slate-100/50 rounded-full p-1 border border-slate-200/50 mr-4">
-                                {['vault', 'materials', 'thesis', 'faculty'].map(v => (
+                                {['vault', 'materials', 'thesis', 'faculty', 'blood-bank'].map(v => (
                                     <a key={v} href="#" onClick={(e) => { e.preventDefault(); navigate(v); }} className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${view === v ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-indigo-600 hover:bg-white'}`}>
-                                        {v.charAt(0).toUpperCase() + v.slice(1)}
+                                        {v === 'blood-bank' ? 'Blood Bank' : v.charAt(0).toUpperCase() + v.slice(1)}
                                     </a>
                                 ))}
                             </div>
@@ -723,6 +819,10 @@ export default function QVaultApp() {
                                             <button onClick={() => navigate('materials')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Materials</button>
                                             <button onClick={() => navigate('thesis')} className="px-5 py-2.5 rounded-xl font-medium text-purple-700 bg-purple-50 border border-purple-100 hover:bg-purple-100 transition-colors text-sm">Thesis</button>
                                             <button onClick={() => navigate('faculty')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Faculty</button>
+                                            
+                                            <button onClick={() => navigate('blood-bank')} className="px-5 py-2.5 rounded-xl font-bold text-white bg-red-600 border border-red-700 hover:bg-red-700 shadow-md hover:shadow-lg transition-all text-sm flex items-center gap-2 transform hover:-translate-y-0.5">
+                                                <i className="fas fa-heartbeat animate-pulse"></i> Blood Bank
+                                            </button>
                                         </div>
 
                                         <div className="mt-8 relative max-w-lg">
@@ -1122,7 +1222,7 @@ export default function QVaultApp() {
                         </div>
                         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden flex flex-col flex-1">
                             <div className="flex border-b border-slate-200 overflow-x-auto">
-                                {['uploads', 'mat_uploads', 'thesis_uploads', 'papers', 'materials', 'thesis', 'faculty'].map(tab => {
+                                {['uploads', 'mat_uploads', 'thesis_uploads', 'papers', 'materials', 'thesis', 'faculty', 'blood'].map(tab => {
                                     const names = { 
                                         uploads: 'Pending Questions', 
                                         mat_uploads: 'Pending Materials', 
@@ -1130,7 +1230,8 @@ export default function QVaultApp() {
                                         papers: 'Questions', 
                                         materials: 'Materials', 
                                         thesis: 'Thesis',
-                                        faculty: 'Faculty' 
+                                        faculty: 'Faculty',
+                                        blood: 'Blood Bank'
                                     };
                                     return (
                                         <button key={tab} onClick={() => setAdminTab(tab)} className={`flex-1 py-4 text-sm font-bold uppercase tracking-wide transition-all whitespace-nowrap px-4 ${adminTab === tab ? 'bg-indigo-50 text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>{names[tab]}</button>
@@ -1339,6 +1440,162 @@ export default function QVaultApp() {
                                     </table>
                                 </div>
                             )}
+
+                            {/* BLOOD BANK TAB */}
+                            {adminTab === 'blood' && (
+                                <div className="p-6 overflow-y-auto">
+                                    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+                                        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                                            <h3 className="font-bold text-lg mb-4">Bulk Import Donors (CSV)</h3>
+                                            <p className="text-sm text-slate-500 mb-4">Expected CSV Header: Name, Dept, Batch, Gender, Contact, Blood Group, Previous Donor (Yes/No), Willingness (1-5)</p>
+                                            <input type="file" accept=".csv" onChange={handleBloodCSVUpload} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
+                                        </div>
+                                        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex justify-between items-center">
+                                            <div>
+                                                <h3 className="font-bold text-lg">Add Single Donor</h3>
+                                                <p className="text-sm text-slate-500">Manually add a student to the blood bank.</p>
+                                            </div>
+                                            <button onClick={() => setShowBloodModal(true)} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20">
+                                                <i className="fas fa-plus mr-2"></i> Add Donor
+                                            </button>
+                                        </div>
+                                        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+                                             <table className="w-full text-sm text-left">
+                                                <thead className="bg-slate-50 text-xs uppercase font-bold text-slate-500">
+                                                    <tr>
+                                                        <th className="px-6 py-3">Name</th>
+                                                        <th className="px-6 py-3">Group</th>
+                                                        <th className="px-6 py-3">Dept</th>
+                                                        <th className="px-6 py-3">Contact</th>
+                                                        <th className="px-6 py-3 text-right">Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {bloodDonors.map(d => (
+                                                        <tr key={d.id} className="hover:bg-slate-50">
+                                                            <td className="px-6 py-3 font-medium">{d.name}</td>
+                                                            <td className="px-6 py-3"><span className="bg-red-50 text-red-600 px-2 py-0.5 rounded font-bold text-xs">{d.blood_group}</span></td>
+                                                            <td className="px-6 py-3">{d.department}</td>
+                                                            <td className="px-6 py-3 font-mono text-xs">{d.contact}</td>
+                                                            <td className="px-6 py-3 text-right">
+                                                <button onClick={() => { setSingleBloodForm(d); setShowBloodModal(true); }} className="text-indigo-500 hover:bg-indigo-50 p-2 rounded-lg transition-colors mr-2"><i className="fas fa-edit"></i></button>
+                                                <button onClick={() => deleteDonor(d.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"><i className="fas fa-trash"></i></button>
+                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+                {/* BLOOD BANK VIEW (Public) */}
+                {view === 'blood-bank' && (
+                    <div className="h-full flex flex-col bg-slate-50 p-4 lg:p-8 overflow-y-auto">
+                        <div className="max-w-7xl mx-auto w-full">
+                            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-8">
+                                <h1 className="text-3xl font-extrabold text-slate-900 mb-2 flex items-center gap-3">
+                                    <span className="bg-red-100 text-red-600 w-12 h-12 rounded-xl flex items-center justify-center"><i className="fas fa-file-medical-alt"></i></span>
+                                    Blood Bank
+                                </h1>
+                                <p className="text-slate-500 text-lg">Find student donors instantly.</p>
+                                
+                                <div className="mt-6 grid grid-cols-2 md:grid-cols-5 gap-4">
+                                     <select className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:ring-2 focus:ring-red-500 outline-none" value={bloodFilter.group} onChange={e => setBloodFilter({...bloodFilter, group: e.target.value})}>
+                                        <option value="All">All Blood Groups</option>
+                                        {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(g => <option key={g} value={g}>{g}</option>)}
+                                    </select>
+                                    <select className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:ring-2 focus:ring-red-500 outline-none" value={bloodFilter.dept} onChange={e => setBloodFilter({...bloodFilter, dept: e.target.value})}>
+                                        <option value="All">All Departments</option>
+                                        {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                                    </select>
+                                    <select className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:ring-2 focus:ring-red-500 outline-none" value={bloodFilter.gender} onChange={e => setBloodFilter({...bloodFilter, gender: e.target.value})}>
+                                        <option value="All">All Genders</option>
+                                        <option value="Male">Male</option>
+                                        <option value="Female">Female</option>
+                                    </select>
+                                    <select className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:ring-2 focus:ring-red-500 outline-none" value={bloodFilter.donorStatus} onChange={e => setBloodFilter({...bloodFilter, donorStatus: e.target.value})}>
+                                        <option value="All">Any History</option>
+                                        <option value="yes">Previous Donor</option>
+                                        <option value="no">New Donor</option>
+                                    </select>
+                                    <select className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:ring-2 focus:ring-red-500 outline-none" value={bloodFilter.willingness} onChange={e => setBloodFilter({...bloodFilter, willingness: e.target.value})}>
+                                        <option value="All">Any Willingness</option>
+                                        <option value="High">Highly Willing (4+ Stars)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                {bloodDonors.filter(d => {
+                                    if (bloodFilter.group !== 'All' && d.blood_group !== bloodFilter.group) return false;
+                                    if (bloodFilter.dept !== 'All' && d.department !== bloodFilter.dept) return false;
+                                    if (bloodFilter.gender !== 'All' && d.gender !== bloodFilter.gender) return false;
+                                    if (bloodFilter.donorStatus !== 'All') {
+                                        const isD = d.is_donor; 
+                                        if (bloodFilter.donorStatus === 'yes' && !isD) return false;
+                                        if (bloodFilter.donorStatus === 'no' && isD) return false;
+                                    }
+                                    if (bloodFilter.willingness === 'High' && d.willingness < 4) return false;
+                                    return true;
+                                }).map(donor => (
+                                    <div key={donor.id} className="group bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-xl hover:border-red-100 transition-all overflow-hidden flex flex-col relative">
+                                        {/* HEADER: Blood Group & Badge */}
+                                        <div className="flex justify-between items-start p-5 pb-0">
+                                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-50 to-red-100 text-red-600 flex items-center justify-center text-xl font-bold border border-red-100 shadow-sm shrink-0">
+                                                {donor.blood_group}
+                                            </div>
+                                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm ${donor.is_donor ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-50 text-slate-500 border border-slate-100'}`}>
+                                                {donor.is_donor ? 'Verified Donor' : 'New Donor'}
+                                            </span>
+                                        </div>
+
+                                        {/* BODY: Name & Details */}
+                                        <div className="p-5 pt-4">
+                                            <h3 className="font-bold text-slate-800 text-xl leading-tight mb-1 font-sans">{donor.name}</h3>
+                                            <div className="text-xs text-slate-500 font-medium uppercase tracking-wide flex flex-col gap-0.5">
+                                                <span>{donor.department}</span>
+                                                <span className="text-slate-400">Batch {donor.batch}</span>
+                                            </div>
+                                            
+                                            {/* Attributes Row */}
+                                            <div className="flex items-center gap-3 mt-4 text-xs font-semibold text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100/50">
+                                                <div className="flex items-center gap-1.5">
+                                                    <i className={`fas fa-${donor.gender === 'Female' ? 'venus text-pink-500' : 'mars text-blue-500'}`}></i> 
+                                                    {donor.gender}
+                                                </div>
+                                                <span className="text-slate-200">|</span>
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-slate-400 font-medium">Willingness:</span>
+                                                    <div className="flex text-amber-400 text-[10px]">
+                                                        {[...Array(5)].map((_,i) => <i key={i} className={`fas fa-star ${i < donor.willingness ? '' : 'text-slate-200'}`}></i>)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* FOOTER: Contact */}
+                                        <div className="mt-auto p-4 border-t border-slate-50 bg-slate-50/50">
+                                            {donor.contact ? (
+                                                <div className="flex flex-col gap-3">
+                                                    <div className="text-center">
+                                                        <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-1">Contact Number</p>
+                                                        <p className="font-mono text-lg font-bold text-slate-700 tracking-wide select-all">{donor.contact}</p>
+                                                    </div>
+                                                    <a href={`tel:${donor.contact}`} className="flex items-center justify-center gap-2 w-full bg-slate-900 border border-slate-900 hover:bg-red-600 hover:border-red-600 text-white font-bold py-3 rounded-xl transition-all shadow-md active:scale-95">
+                                                        <i className="fas fa-phone-alt animate-pulse"></i> Call Now
+                                                    </a>
+                                                </div>
+                                            ) : (
+                                                <span className="block text-center text-slate-400 text-sm italic py-2">No Contact Info</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 )}
@@ -1881,6 +2138,48 @@ export default function QVaultApp() {
                             </div>
                         </div>
                         <div className="p-4 border-t border-slate-100 bg-slate-50"><button onClick={() => setShowMaterialsFilter(false)} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-indigo-700">Apply Filters</button></div>
+                    </div>
+                </div>
+            )}
+
+            {/* SINGLE BLOOD ADD MODAL */}
+            {showBloodModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowBloodModal(false)}></div>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg z-10 flex flex-col max-h-[90vh] overflow-hidden transform transition-all">
+                        <div className="flex justify-between items-center p-6 border-b border-slate-100 bg-white">
+                            <h3 className="text-xl font-bold text-slate-900">Add Donor</h3>
+                            <button onClick={() => setShowBloodModal(false)} className="text-slate-400 hover:text-slate-600"><i className="fas fa-times text-xl"></i></button>
+                        </div>
+                        
+                        <div className="p-6 overflow-y-auto custom-scrollbar space-y-5">
+                            <input placeholder="Full Name" value={singleBloodForm.name} onChange={e => setSingleBloodForm({ ...singleBloodForm, name: e.target.value })} className="w-full border-slate-300 rounded-xl shadow-sm border p-3 focus:ring-2 focus:ring-red-500/20 outline-none" />
+                            <div className="grid grid-cols-2 gap-4">
+                                <select value={singleBloodForm.department} onChange={e => setSingleBloodForm({ ...singleBloodForm, department: e.target.value })} className="w-full border-slate-300 rounded-xl border p-3 bg-white focus:ring-2 focus:ring-red-500/20 outline-none">{DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}</select>
+                                <input placeholder="Batch (e.g. 24)" value={singleBloodForm.batch} onChange={e => setSingleBloodForm({ ...singleBloodForm, batch: e.target.value })} className="w-full border-slate-300 rounded-xl border p-3 focus:ring-2 focus:ring-red-500/20 outline-none" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <select value={singleBloodForm.gender} onChange={e => setSingleBloodForm({ ...singleBloodForm, gender: e.target.value })} className="w-full border-slate-300 rounded-xl border p-3 bg-white focus:ring-2 focus:ring-red-500/20 outline-none"><option value="Male">Male</option><option value="Female">Female</option></select>
+                                <select value={singleBloodForm.blood_group} onChange={e => setSingleBloodForm({ ...singleBloodForm, blood_group: e.target.value })} className="w-full border-slate-300 rounded-xl border p-3 bg-white focus:ring-2 focus:ring-red-500/20 outline-none">{['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(g => <option key={g} value={g}>{g}</option>)}</select>
+                            </div>
+                            <input placeholder="Contact Number" value={singleBloodForm.contact} onChange={e => setSingleBloodForm({ ...singleBloodForm, contact: e.target.value })} className="w-full border-slate-300 rounded-xl border p-3 focus:ring-2 focus:ring-red-500/20 outline-none" />
+                            <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" checked={singleBloodForm.is_donor} onChange={e => setSingleBloodForm({ ...singleBloodForm, is_donor: e.target.checked })} className="w-5 h-5 text-red-600 rounded focus:ring-red-500" />
+                                    <span className="text-sm font-medium text-slate-700">Previous Donor?</span>
+                                </label>
+                            </div>
+                             <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Willingness to Donate (1-5)</label>
+                                <input type="range" min="1" max="5" value={singleBloodForm.willingness} onChange={e => setSingleBloodForm({ ...singleBloodForm, willingness: parseInt(e.target.value) })} className="w-full accent-red-600" />
+                                <div className="text-center text-red-600 font-bold mt-1">{singleBloodForm.willingness} Stars</div>
+                            </div>
+                        </div>
+
+                        <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+                            <button onClick={() => setShowBloodModal(false)} className="px-6 py-2.5 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-200 transition-colors">Cancel</button>
+                            <button onClick={handleSingleBloodAdd} className="bg-red-600 text-white px-8 py-2.5 rounded-xl font-bold hover:bg-red-700 shadow-lg shadow-red-500/30 transition-all">Add Donor</button>
+                        </div>
                     </div>
                 </div>
             )}
