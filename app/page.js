@@ -127,6 +127,9 @@ export default function QVaultApp() {
     
     // New State for Course List
     const [courseListDept, setCourseListDept] = useState('Computer Science & Engineering');
+    
+    // Blood Bank Filter State
+    const [showBloodFilter, setShowBloodFilter] = useState(false);
 
     // Upload Form State
     const [uploadType, setUploadType] = useState('paper'); // 'paper' or 'material'
@@ -220,7 +223,7 @@ export default function QVaultApp() {
         channel.subscribe((status) => {
             console.log(`Supabase Realtime Status: ${status}`);
             if (status === 'SUBSCRIBED') {
-                showToast('Connected', 'Real-time updates active', 'success');
+                // showToast('Connected', 'Real-time updates active', 'success');
             }
             if (status === 'CHANNEL_ERROR') {
                 console.error('Realtime channel error. Check your network or Supabase project settings.');
@@ -900,7 +903,10 @@ export default function QVaultApp() {
                     <div className="h-full flex flex-col bg-slate-50 p-6 lg:p-10 overflow-y-auto">
                         <div className="mb-6 flex flex-wrap gap-4 justify-between items-end">
                             <div className="flex items-center gap-4">
-                                <div><h3 className="text-2xl font-bold text-slate-900">Question Bank</h3><p className="text-sm text-slate-500 mt-1">Browse past exam papers</p></div>
+                                <div>
+                                    <h3 className="text-2xl font-bold text-slate-900">Question Bank</h3>
+                                    <p className="text-sm text-slate-500 mt-1">Browse past exam papers</p>
+                                </div>
                             </div>
                             <div className="flex items-center gap-3">
                                 <button onClick={() => setShowVaultFilter(true)} className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl font-bold hover:bg-slate-50 shadow-sm"><i className="fas fa-sliders-h text-indigo-500"></i> Filters</button>
@@ -1502,30 +1508,21 @@ export default function QVaultApp() {
                                     Blood Bank
                                 </h1>
                                 <p className="text-slate-500 text-lg">Find student donors instantly.</p>
+                                <p className="text-xs text-emerald-600 mt-2 font-medium italic">
+                                    "যে কেউ একজনের জীবন রক্ষা করল, সে যেন সমগ্র মানবজাতির জীবন রক্ষা করল।" (সূরা আল-মায়িদাহ, ৫:৩২)
+                                </p>
                                 
-                                <div className="mt-6 grid grid-cols-2 md:grid-cols-5 gap-4">
-                                     <select className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:ring-2 focus:ring-red-500 outline-none" value={bloodFilter.group} onChange={e => setBloodFilter({...bloodFilter, group: e.target.value})}>
-                                        <option value="All">All Blood Groups</option>
-                                        {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(g => <option key={g} value={g}>{g}</option>)}
-                                    </select>
-                                    <select className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:ring-2 focus:ring-red-500 outline-none" value={bloodFilter.dept} onChange={e => setBloodFilter({...bloodFilter, dept: e.target.value})}>
-                                        <option value="All">All Departments</option>
-                                        {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-                                    </select>
-                                    <select className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:ring-2 focus:ring-red-500 outline-none" value={bloodFilter.gender} onChange={e => setBloodFilter({...bloodFilter, gender: e.target.value})}>
-                                        <option value="All">All Genders</option>
-                                        <option value="Male">Male</option>
-                                        <option value="Female">Female</option>
-                                    </select>
-                                    <select className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:ring-2 focus:ring-red-500 outline-none" value={bloodFilter.donorStatus} onChange={e => setBloodFilter({...bloodFilter, donorStatus: e.target.value})}>
-                                        <option value="All">Any History</option>
-                                        <option value="yes">Previous Donor</option>
-                                        <option value="no">New Donor</option>
-                                    </select>
-                                    <select className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:ring-2 focus:ring-red-500 outline-none" value={bloodFilter.willingness} onChange={e => setBloodFilter({...bloodFilter, willingness: e.target.value})}>
-                                        <option value="All">Any Willingness</option>
-                                        <option value="High">Highly Willing (4+ Stars)</option>
-                                    </select>
+                                <div className="mt-6 flex gap-3">
+                                    <button onClick={() => setShowBloodFilter(true)} className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl font-bold hover:bg-slate-50 shadow-sm transition-all">
+                                        <i className="fas fa-sliders-h text-red-500"></i> Filters
+                                    </button>
+                                    
+                                    {/* Active Filter Badges */}
+                                    <div className="flex gap-2 items-center flex-wrap">
+                                        {bloodFilter.group !== 'All' && <span className="bg-red-50 text-red-600 px-3 py-1 rounded-full text-xs font-bold border border-red-100">{bloodFilter.group} <i className="fas fa-times ml-1 cursor-pointer" onClick={() => setBloodFilter(p => ({...p, group: 'All'}))}></i></span>}
+                                        {bloodFilter.dept !== 'All' && <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-bold border border-slate-200">{bloodFilter.dept} <i className="fas fa-times ml-1 cursor-pointer" onClick={() => setBloodFilter(p => ({...p, dept: 'All'}))}></i></span>}
+                                        {bloodFilter.gender !== 'All' && <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold border border-blue-100">{bloodFilter.gender} <i className="fas fa-times ml-1 cursor-pointer" onClick={() => setBloodFilter(p => ({...p, gender: 'All'}))}></i></span>}
+                                    </div>
                                 </div>
                             </div>
 
@@ -2180,6 +2177,46 @@ export default function QVaultApp() {
                             <button onClick={() => setShowBloodModal(false)} className="px-6 py-2.5 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-200 transition-colors">Cancel</button>
                             <button onClick={handleSingleBloodAdd} className="bg-red-600 text-white px-8 py-2.5 rounded-xl font-bold hover:bg-red-700 shadow-lg shadow-red-500/30 transition-all">Add Donor</button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* BLOOD FILTER DRAWER */}
+            {showBloodFilter && (
+                <div className="fixed inset-0 z-50">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowBloodFilter(false)}></div>
+                    <div className="absolute inset-y-0 left-0 max-w-xs w-full bg-white shadow-2xl flex flex-col">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"><i className="fas fa-filter text-red-500"></i> Filters</h2>
+                            <button onClick={() => setShowBloodFilter(false)} className="text-slate-400 hover:text-slate-600 bg-white p-2 rounded-full shadow-sm border border-slate-100"><i className="fas fa-times"></i></button>
+                        </div>
+                        <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Blood Group</label>
+                                <select value={bloodFilter.group} onChange={e => setBloodFilter({...bloodFilter, group: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"><option value="All">All Blood Groups</option>{['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(g => <option key={g} value={g}>{g}</option>)}</select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Department</label>
+                                <select value={bloodFilter.dept} onChange={e => setBloodFilter({...bloodFilter, dept: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"><option value="All">All Departments</option>{DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}</select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Gender</label>
+                                <div className="flex bg-slate-100 p-1 rounded-lg">
+                                    {['All', 'Male', 'Female'].map(g => (
+                                        <button key={g} onClick={() => setBloodFilter({...bloodFilter, gender: g})} className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${bloodFilter.gender === g ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>{g}</button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">History</label>
+                                <select value={bloodFilter.donorStatus} onChange={e => setBloodFilter({...bloodFilter, donorStatus: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"><option value="All">Any History</option><option value="yes">Previous Donor</option><option value="no">New Donor</option></select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Willingness</label>
+                                <select value={bloodFilter.willingness} onChange={e => setBloodFilter({...bloodFilter, willingness: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"><option value="All">Any Willingness</option><option value="High">Highly Willing (4+ Stars)</option></select>
+                            </div>
+                        </div>
+                        <div className="p-4 border-t border-slate-100 bg-slate-50"><button onClick={() => setShowBloodFilter(false)} className="w-full bg-red-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-red-700">Apply Filters</button></div>
                     </div>
                 </div>
             )}
