@@ -160,7 +160,7 @@ export default function QVaultApp() {
 
     // Filters State
     const [filters, setFilters] = useState({
-        vault: { search: '', dept: '', semSeason: '', semYear: '', type: '' },
+        vault: { search: '', dept: '', semSeason: '', semYear: '', type: '', course: '' },
         materials: { search: '', dept: '', semSeason: '', semYear: '', teacher: '', course: '', type: '' },
         faculty: { search: '', dept: 'Computer Science & Engineering' },
         adminPaper: { search: '' },
@@ -915,7 +915,8 @@ export default function QVaultApp() {
                                     (!filters.vault.dept || p.dept === filters.vault.dept) &&
                                     (!filters.vault.semSeason || (p.semester && p.semester.includes(filters.vault.semSeason))) &&
                                     (!filters.vault.semYear || (p.semester && p.semester.includes(filters.vault.semYear))) &&
-                                    (!filters.vault.type || p.type === filters.vault.type)
+                                    (!filters.vault.type || p.type === filters.vault.type) &&
+                                    (!filters.vault.course || p.courseCode === filters.vault.course)
                                 ).length}</span>
                             </div>
                         </div>
@@ -925,7 +926,8 @@ export default function QVaultApp() {
                                 (!filters.vault.dept || p.dept === filters.vault.dept) &&
                                 (!filters.vault.semSeason || (p.semester && p.semester.includes(filters.vault.semSeason))) &&
                                 (!filters.vault.semYear || (p.semester && p.semester.includes(filters.vault.semYear))) &&
-                                (!filters.vault.type || p.type === filters.vault.type)
+                                (!filters.vault.type || p.type === filters.vault.type) &&
+                                (!filters.vault.course || p.courseCode === filters.vault.course)
                             ).map(p => (
                                 <div key={p.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 hover:translate-y-[-4px] transition-transform duration-300 flex flex-col overflow-hidden">
                                     <div className="p-6 flex-1">
@@ -2094,6 +2096,15 @@ export default function QVaultApp() {
                                 </div>
                             </div>
                             <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Course</label>
+                                <select value={filters.vault.course} onChange={e => setFilters(prev => ({ ...prev, vault: { ...prev.vault, course: e.target.value } }))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none">
+                                    <option value="">All Courses</option>
+                                    {COURSE_DB.sort((a,b) => a.code.localeCompare(b.code)).map(c => (
+                                        <option key={c.code} value={c.code}>{c.code} - {c.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Type</label>
                                 <div className="flex bg-slate-100 p-1 rounded-lg">
                                     {['', 'theory', 'lab'].map(t => (
@@ -2122,6 +2133,10 @@ export default function QVaultApp() {
                                 <input type="text" value={filters.materials.search} onChange={e => setFilters(prev => ({ ...prev, materials: { ...prev.materials, search: e.target.value } }))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none" placeholder="Topic..." />
                             </div>
                             <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Department</label>
+                                <select value={filters.materials.dept} onChange={e => setFilters(prev => ({ ...prev, materials: { ...prev.materials, dept: e.target.value } }))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"><option value="">All Departments</option>{DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}</select>
+                            </div>
+                            <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Category</label>
                                 <select value={filters.materials.type} onChange={e => setFilters(prev => ({ ...prev, materials: { ...prev.materials, type: e.target.value } }))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"><option value="">All Types</option><option value="book">Books</option><option value="slide">Slides</option><option value="note">Notes</option></select>
                             </div>
@@ -2131,7 +2146,7 @@ export default function QVaultApp() {
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Course</label>
-                                <select value={filters.materials.course} onChange={e => setFilters(prev => ({ ...prev, materials: { ...prev.materials, course: e.target.value } }))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"><option value="">All Courses</option>{[...new Set(materials.map(m => m.courseCode))].sort().map(c => <option key={c} value={c}>{c}</option>)}</select>
+                                <select value={filters.materials.course} onChange={e => setFilters(prev => ({ ...prev, materials: { ...prev.materials, course: e.target.value } }))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"><option value="">All Courses</option>{COURSE_DB.sort((a,b) => a.code.localeCompare(b.code)).map(c => <option key={c.code} value={c.code}>{c.code} - {c.name}</option>)}</select>
                             </div>
                         </div>
                         <div className="p-4 border-t border-slate-100 bg-slate-50"><button onClick={() => setShowMaterialsFilter(false)} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-indigo-700">Apply Filters</button></div>
