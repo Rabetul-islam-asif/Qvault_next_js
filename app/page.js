@@ -1487,7 +1487,7 @@ export default function QVaultApp() {
                                                             <td className="px-6 py-3 font-mono text-xs">{d.contact}</td>
                                                             <td className="px-6 py-3 text-right">
                                                 <button onClick={() => { setSingleBloodForm(d); setShowBloodModal(true); }} className="text-indigo-500 hover:bg-indigo-50 p-2 rounded-lg transition-colors mr-2"><i className="fas fa-edit"></i></button>
-                                                <button onClick={() => deleteDonor(d.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"><i className="fas fa-trash"></i></button>
+                                                <button onClick={() => deleteItem(d.id, 'blood_donors')} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"><i className="fas fa-trash"></i></button>
                                             </td>
                                                         </tr>
                                                     ))}
@@ -1540,7 +1540,13 @@ export default function QVaultApp() {
                                     }
                                     if (bloodFilter.willingness === 'High' && d.willingness < 4) return false;
                                     return true;
-                                }).map(donor => (
+                                }).filter((d, index, self) => 
+                                    index === self.findIndex((t) => (
+                                        t.name === d.name && 
+                                        t.blood_group === d.blood_group && 
+                                        t.contact === d.contact
+                                    ))
+                                ).map(donor => (
                                     <div key={donor.id} className="group bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-xl hover:border-red-100 transition-all overflow-hidden flex flex-col relative">
                                         {/* HEADER: Blood Group & Badge */}
                                         <div className="flex justify-between items-start p-5 pb-0">
