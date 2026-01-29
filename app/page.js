@@ -301,16 +301,21 @@ export default function QVaultApp() {
             header: true,
             complete: async (results) => {
                 console.log('Parsed CSV:', results.data);
-                const donors = results.data.map(row => ({
-                    name: row.Name || row.name,
-                    department: row.Dept || row.Department || row.department,
-                    batch: row.Batch || row.batch,
-                    gender: row.Gender || row.gender,
-                    contact: row.Contact || row.contact,
-                    blood_group: row.BloodGroup || row.blood_group || row['Blood Group'],
-                    is_donor: (row.PreviousDonor || row.is_donor || row['Previous Donor']) === 'Yes' || (row.PreviousDonor || row.is_donor || row['Previous Donor']) === true || (row.PreviousDonor || row.is_donor || row['Previous Donor']) === 'true',
-                    willingness: parseInt(row.Willingness || row.willingness || 5)
-                })).filter(d => d.name && d.blood_group);
+                const donors = results.data.map(row => {
+                    // Support multiple column name variations (including Google Forms exports)
+                    const name = row.Name || row.name || row['Full Name'] || row['full name'];
+                    const department = row.Dept || row.Department || row.department || row.dept;
+                    const batch = row.Batch || row.batch;
+                    const gender = row.Gender || row.gender;
+                    const contact = row.Contact || row.contact || row['Contact Number'] || row['contact number'] || row.Phone || row.phone;
+                    const blood_group = row.BloodGroup || row.blood_group || row['Blood Group'] || row['blood group'];
+                    const previousDonor = row.PreviousDonor || row.is_donor || row['Previous Donor'] || row['Have you donated blood before?'];
+                    const is_donor = previousDonor === 'Yes' || previousDonor === true || previousDonor === 'true' || previousDonor === 'yes';
+                    const willingnessValue = row.Willingness || row.willingness || row['Willingness to Donate'] || row['willingness to donate'] || '5';
+                    const willingness = parseInt(willingnessValue) || 5;
+                    
+                    return { name, department, batch, gender, contact, blood_group, is_donor, willingness };
+                }).filter(d => d.name && d.blood_group);
 
                 if (donors.length === 0) return showToast('Error', 'No valid rows found', 'error');
 
