@@ -66,6 +66,7 @@ const COURSE_DB = [
     { code: "0613CSE432", name: "System Design and Software Engineering Sessional", credits: 1.5, type: "lab" },
     { code: "0613CSE441", name: "Computer and Cyber Security", credits: 3, type: "theory" },
     { code: "0613CSE477", name: "Computer Vision", credits: 3, type: "theory" },
+    { code: "0613CSE487", name: "Mobile Applications Development", credits: 3, type: "theory" },
     { code: "0613CSI483", name: "Machine Learning", credits: 3, type: "theory" },
     { code: "0713EEE193", name: "Electrical Circuit and Devices", credits: 3, type: "theory" },
     { code: "0714CSE213", name: "Digital Electronics and Pulse Technique", credits: 3, pre: "0714EEE195", type: "theory" },
