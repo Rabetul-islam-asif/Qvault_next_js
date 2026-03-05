@@ -751,7 +751,6 @@ export default function QVaultApp() {
         }
 
         setShowTeacherModal(false);
-        window.location.reload(); // Refresh to show changes
     };
 
     // --- RENDERERS ---
