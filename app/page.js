@@ -47,6 +47,7 @@ const COURSE_DB = [
     { code: "0612CSE315", name: "Computer Network", credits: 3, type: "theory" },
     { code: "0612CSE316", name: "Computer Network Sessional", credits: 1.5, type: "lab" },
     { code: "0612CSE335", name: "Data Communication", credits: 3, type: "theory" },
+    { code: "0612CSE361", name: "Software Architecture", credits: 3, type: "theory" },
     { code: "0612CSI381", name: "Data Mining and Knowledge Discovery", credits: 3, type: "theory" },
     { code: "0612CSI382", name: "Data Mining and Knowledge Discovery Sessional", credits: 1.5, type: "lab" },
     { code: "0613CSE123", name: "Structured Programming Language", credits: 3, type: "theory" },
