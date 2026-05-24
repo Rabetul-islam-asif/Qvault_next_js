@@ -923,9 +923,41 @@ export default function QVaultApp() {
 
         setIsSubmittingNotice(true);
         try {
+            let finalImageUrl = noticeForm.imageUrl;
+
+            // If local file is selected, upload to Supabase Storage
+            if (noticeForm.file) {
+                console.log('Uploading notice image to Supabase Storage:', noticeForm.file.name);
+                const timestamp = Date.now();
+                const randomStr = Math.random().toString(36).substring(2, 8);
+                const extension = noticeForm.file.name.split('.').pop() || 'png';
+                const fileName = `notice_${timestamp}_${randomStr}.${extension}`;
+                const filePath = `notices/${fileName}`;
+
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('qvault-files')
+                    .upload(filePath, noticeForm.file, {
+                        cacheControl: '365d',
+                        upsert: false
+                    });
+
+                if (uploadError) {
+                    console.error('Supabase notices upload error:', uploadError);
+                    throw new Error('Supabase Storage upload failed: ' + uploadError.message);
+                }
+
+                // Get public URL
+                const { data: urlData } = supabase.storage
+                    .from('qvault-files')
+                    .getPublicUrl(filePath);
+
+                finalImageUrl = urlData.publicUrl;
+                console.log('Notice image uploaded successfully to Supabase Storage:', finalImageUrl);
+            }
+
             const noticeData = {
                 title: noticeForm.title,
-                image_url: noticeForm.imageUrl,
+                image_url: finalImageUrl,
                 expires_at: new Date(noticeForm.expiresAt).toISOString(),
                 target_batch: noticeForm.targetBatch || 'All Students',
                 created_at: new Date().toISOString()
