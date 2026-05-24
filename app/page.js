@@ -84,7 +84,7 @@ const DEPARTMENTS = [
 export default function QVaultApp() {
     // --- STATE ---
     const [supabase, setSupabase] = useState(null);
-    const [view, setView] = useState('home');
+    const [view, setView] = useState('notices');
     const [teachers, setTeachers] = useState([]);
     const [papers, setPapers] = useState([]);
     const [materials, setMaterials] = useState([]);
@@ -92,6 +92,29 @@ export default function QVaultApp() {
     const [pendingPapers, setPendingPapers] = useState([]);
     const [pendingMaterials, setPendingMaterials] = useState([]);
     const [pendingThesis, setPendingThesis] = useState([]);
+    
+    // Notices State Hooks
+    const [notices, setNotices] = useState([]);
+    const [currentSlide, setCurrentSlide] = useState(0);
+    const [isNoticeAutoplay, setIsNoticeAutoplay] = useState(true);
+    const [showNoticeLightbox, setShowNoticeLightbox] = useState(false);
+    const [lightboxNotice, setLightboxNotice] = useState(null);
+    const [noticeSearchQuery, setNoticeSearchQuery] = useState('');
+    const [noticeForm, setNoticeForm] = useState({
+        title: '',
+        imageUrl: '',
+        expiresAt: '',
+        file: null
+    });
+
+    // Course Outlines State Hooks
+    const [courseOutlines, setCourseOutlines] = useState([]);
+    const [outlineForm, setOutlineForm] = useState({
+        courseCode: '',
+        courseName: '',
+        outlineUrl: '',
+        file: null
+    });
     const [user, setUser] = useState(null); // 'admin' or null
     const [deferredPrompt, setDeferredPrompt] = useState(null);
     const [showInstallModal, setShowInstallModal] = useState(false);
@@ -146,10 +169,13 @@ export default function QVaultApp() {
         exam: 'Mid',
         teacherId: 'Additional',
         thesisTitle: '', author: '', studentId: '', supervisorId: 'Additional', abstract: '',
-        thesisType: 'thesis', thesisCategory: '', projectLink: ''
+        thesisType: 'thesis', thesisCategory: '', projectLink: '',
+        courseMaterialsLink: '', pdfUploadLink: '',
+        keywords: '', slidesLink: ''
     });
     const [uploadFile, setUploadFile] = useState(null);
     const [selectedImages, setSelectedImages] = useState([]);
+    const [showCatboxTutorial, setShowCatboxTutorial] = useState(false);
 
     // Searchable Dropdown States
     const [teacherSearch, setTeacherSearch] = useState('');
@@ -200,6 +226,8 @@ export default function QVaultApp() {
             { name: 'thesis_papers', setter: setThesisPapers },
             { name: 'pending_thesis_papers', setter: setPendingThesis },
             { name: 'blood_donors', setter: setBloodDonors },
+            { name: 'notices', setter: setNotices },
+            { name: 'course_outlines', setter: setCourseOutlines },
         ];
 
         // Fetch initial data
@@ -240,6 +268,18 @@ export default function QVaultApp() {
              supabase.removeChannel(channel);
         };
     }, [supabase]);
+
+    // notices autoplay effect (6s swap, pauses if isNoticeAutoplay is false)
+    useEffect(() => {
+        const activeNotices = notices.filter(n => new Date(n.expires_at) > new Date());
+        if (activeNotices.length <= 1 || !isNoticeAutoplay) return;
+
+        const interval = setInterval(() => {
+            setCurrentSlide(prev => (prev + 1) % activeNotices.length);
+        }, 6000);
+
+        return () => clearInterval(interval);
+    }, [notices, isNoticeAutoplay]);
 
     // 3. PWA Installer Listener
     useEffect(() => {
@@ -287,6 +327,65 @@ export default function QVaultApp() {
     const getTeacherName = (id) => {
         const t = teachers.find(x => x.id == id);
         return t ? t.name : (isNaN(id) ? id : 'Guest Faculty');
+    };
+
+    const parseThesisAbstract = (combinedText) => {
+        if (!combinedText) return { abstract: '', keywords: '', slidesLink: '' };
+        
+        let abstractText = combinedText;
+        let keywords = '';
+        let slidesLink = '';
+        
+        // Match Keywords (case-insensitive, matching until end of line or next section)
+        const keywordsMatch = combinedText.match(/(?:\r?\n)*Keywords:\s*([^\r\n]+)/i);
+        if (keywordsMatch) {
+            keywords = keywordsMatch[1].trim();
+            abstractText = abstractText.replace(/(?:\r?\n)*Keywords:\s*[^\r\n]+/i, '');
+        }
+        
+        // Match Presentation Slides (case-insensitive)
+        const slidesMatch = combinedText.match(/(?:\r?\n)*Presentation Slides:\s*([^\r\n\s]+)/i);
+        if (slidesMatch) {
+            slidesLink = slidesMatch[1].trim();
+            abstractText = abstractText.replace(/(?:\r?\n)*Presentation Slides:\s*[^\r\n\s]+/i, '');
+        }
+        
+        return { 
+            abstract: abstractText.trim(), 
+            keywords: keywords, 
+            slidesLink: slidesLink 
+        };
+    };
+
+    const updateTeacherCourseHistory = async (teacherId, courseCode, courseName) => {
+        if (!supabase || !teacherId) return;
+        
+        // Find the teacher in state or database
+        const teacher = teachers.find(t => t.id == teacherId);
+        if (!teacher) return;
+        
+        const currentCourses = teacher.courses || [];
+        // Check if the course code already exists in their course history
+        const alreadyExists = currentCourses.some(c => c.code === courseCode);
+        
+        if (!alreadyExists) {
+            const updatedCourses = [
+                ...currentCourses,
+                { code: courseCode, name: courseName, ongoing: false }
+            ];
+            
+            // Save the updated courses back to Supabase
+            const { error } = await supabase
+                .from('teachers')
+                .update({ courses: updatedCourses })
+                .eq('id', teacherId);
+                
+            if (error) {
+                console.error('Error updating teacher course history:', error);
+            } else {
+                console.log(`Successfully added ${courseCode} to teacher ${teacher.name}'s course history`);
+            }
+        }
     };
 
     const navigate = (newView) => {
@@ -404,6 +503,13 @@ export default function QVaultApp() {
             setUploadFile(null); // Clear any previous PDF
             e.target.value = ''; // Reset input to allow selecting same file again
         } else if (firstFile.type === 'application/pdf') {
+            // Check if size is larger than 4.5 MB
+            if (firstFile.size > 4.5 * 1024 * 1024) {
+                setShowCatboxTutorial(true);
+                showToast('File Too Large', 'PDF size exceeds 4.5MB. Please upload manually.', 'error');
+                e.target.value = ''; // Reset input
+                return;
+            }
             // Handle PDF directly
             setUploadFile(firstFile);
             setSelectedImages([]); // Clear any selected images
@@ -490,49 +596,96 @@ export default function QVaultApp() {
     const submitUpload = async () => {
         if (!supabase) return showToast('Error', 'Database connection not ready', 'error');
         
-        let fileToUpload = uploadFile;
+        let url = '';
         
-        // If images are selected, convert them to PDF first
-        if (selectedImages.length > 0) {
-            fileToUpload = await convertImagesToPDF();
-            if (!fileToUpload) return; // Conversion failed
-        }
-        
-        if (!fileToUpload) return showToast('Error', 'Please select a PDF file or images', 'error');
-        setIsUploading(true);
-
-        try {
-            console.log('Uploading file:', fileToUpload.name, 'Size:', fileToUpload.size, 'bytes');
-            
-            // Generate unique filename
-            const timestamp = Date.now();
-            const randomStr = Math.random().toString(36).substring(2, 8);
-            const fileName = `${uploadType}_${timestamp}_${randomStr}.pdf`;
-            const filePath = `uploads/${fileName}`;
-            
-            // Upload to Supabase Storage
-            console.log('Uploading to Supabase Storage...');
-            const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('qvault-files')
-                .upload(filePath, fileToUpload, {
-                    cacheControl: '3600',
-                    upsert: false
-                });
-            
-            if (uploadError) {
-                console.error('Supabase upload error:', uploadError);
-                throw new Error('Upload failed: ' + uploadError.message);
+        // Determine URL depending on links
+        if (uploadType === 'material') {
+            if (uploadFormData.matType === 'course_link' && !uploadFormData.courseMaterialsLink) {
+                return showToast('Error', 'Please provide the Course Materials Link', 'error');
             }
             
-            // Get public URL
-            const { data: urlData } = supabase.storage
-                .from('qvault-files')
-                .getPublicUrl(filePath);
+            if (uploadFormData.courseMaterialsLink) {
+                url = uploadFormData.courseMaterialsLink;
+            } else if (uploadFormData.pdfUploadLink) {
+                url = uploadFormData.pdfUploadLink;
+            }
+        }
+        
+        // If we don't have a URL link from the form, we must upload a file
+        if (!url) {
+            let fileToUpload = uploadFile;
             
-            const url = urlData.publicUrl;
-            console.log('File uploaded successfully:', url);
-
+            // If images are selected, convert them to PDF first
+            if (selectedImages.length > 0) {
+                fileToUpload = await convertImagesToPDF();
+                if (!fileToUpload) return; // Conversion failed
+            }
+            
+            if (!fileToUpload) {
+                return showToast('Error', 'Please select a PDF file, select images, or provide a link', 'error');
+            }
+            
+            // Check size limits before uploading
+            if (fileToUpload.size > 4.5 * 1024 * 1024) {
+                setShowCatboxTutorial(true);
+                return showToast('File Too Large', 'PDF size exceeds 4.5MB limit. Please upload manually.', 'error');
+            }
+            
+            setIsUploading(true);
+            try {
+                console.log('Uploading file:', fileToUpload.name, 'Size:', fileToUpload.size, 'bytes');
+                
+                // Generate unique filename
+                const timestamp = Date.now();
+                const randomStr = Math.random().toString(36).substring(2, 8);
+                const fileName = `${uploadType}_${timestamp}_${randomStr}.pdf`;
+                const filePath = `uploads/${fileName}`;
+                
+                // Upload to Supabase Storage
+                console.log('Uploading to Supabase Storage...');
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('qvault-files')
+                    .upload(filePath, fileToUpload, {
+                        cacheControl: '3600',
+                        upsert: false
+                    });
+                
+                if (uploadError) {
+                    console.error('Supabase upload error:', uploadError);
+                    throw new Error('Upload failed: ' + uploadError.message);
+                }
+                
+                // Get public URL
+                const { data: urlData } = supabase.storage
+                    .from('qvault-files')
+                    .getPublicUrl(filePath);
+                
+                url = urlData.publicUrl;
+                console.log('File uploaded successfully:', url);
+            } catch (e) {
+                console.error('Upload Error:', e);
+                showToast('Error', e.message || 'Upload failed', 'error');
+                setIsUploading(false);
+                return;
+            }
+        } else {
+            // Check link validity if they paste one
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                return showToast('Error', 'Please enter a valid link starting with http:// or https://', 'error');
+            }
+        }
+        
+        setIsUploading(true);
+        try {
             if (uploadType === 'thesis') {
+                let combinedAbstract = uploadFormData.abstract || '';
+                if (uploadFormData.keywords) {
+                    combinedAbstract += `\n\nKeywords: ${uploadFormData.keywords}`;
+                }
+                if (uploadFormData.slidesLink) {
+                    combinedAbstract += `\n\nPresentation Slides: ${uploadFormData.slidesLink}`;
+                }
+
                 const thesisData = {
                     title: uploadFormData.thesisTitle,
                     author: uploadFormData.author,
@@ -541,7 +694,7 @@ export default function QVaultApp() {
                     year: parseInt(uploadFormData.semYear),
                     semester: uploadFormData.semSeason,
                     supervisorid: uploadFormData.supervisorId,
-                    abstract: uploadFormData.abstract,
+                    abstract: combinedAbstract,
                     fileurl: url,
                     type: uploadFormData.thesisType,
                     category: uploadFormData.thesisCategory,
@@ -572,9 +725,16 @@ export default function QVaultApp() {
             setShowUploadModal(false);
             setUploadFile(null);
             setSelectedImages([]);
+            setUploadFormData(prev => ({
+                ...prev,
+                courseMaterialsLink: '',
+                pdfUploadLink: '',
+                keywords: '',
+                slidesLink: ''
+            }));
         } catch (e) {
-            console.error('Upload Error:', e);
-            showToast('Error', e.message || 'Upload failed', 'error');
+            console.error('Database Error:', e);
+            showToast('Error', e.message || 'Database submission failed', 'error');
         } finally {
             setIsUploading(false);
         }
@@ -641,6 +801,11 @@ export default function QVaultApp() {
             return;
         }
 
+        // Successfully approved! Update Teacher's Course History automatically
+        if (type === 'paper' || type === 'material') {
+            await updateTeacherCourseHistory(item.teacherId, item.courseCode, item.courseName);
+        }
+
         const { error: deleteError, data: deleteData } = await supabase.from(sourceTable).delete().eq('id', item.id).select();
         
         if (deleteError) {
@@ -704,6 +869,10 @@ export default function QVaultApp() {
             setTeachers(prev => prev.filter(i => i.id !== id));
         } else if (table === 'thesis_papers') {
             setThesisPapers(prev => prev.filter(i => i.id !== id));
+        } else if (table === 'notices') {
+            setNotices(prev => prev.filter(i => i.id !== id));
+        } else if (table === 'course_outlines') {
+            setCourseOutlines(prev => prev.filter(i => i.id !== id));
         }
 
         const { error } = await supabase.from(table).delete().eq('id', id);
@@ -713,6 +882,132 @@ export default function QVaultApp() {
             showToast('Error', 'Delete failed: ' + error.message, 'error');
         } else {
             showToast('Deleted', 'Item removed permanently');
+        }
+    };
+
+    // --- NOTICES MANAGEMENT LOGIC ---
+    const handleNoticeFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setNoticeForm(prev => ({
+                    ...prev,
+                    file: file,
+                    imageUrl: reader.result
+                }));
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleNoticeSubmit = async (e) => {
+        e.preventDefault();
+        if (!supabase) return;
+        if (!noticeForm.imageUrl) {
+            alert('Please upload an image or paste a valid image URL!');
+            return;
+        }
+        if (!noticeForm.title) {
+            alert('Please enter a notice title!');
+            return;
+        }
+        if (!noticeForm.expiresAt) {
+            alert('Please specify the expiration date and time!');
+            return;
+        }
+
+        const noticeData = {
+            title: noticeForm.title,
+            image_url: noticeForm.imageUrl,
+            expires_at: new Date(noticeForm.expiresAt).toISOString(),
+            created_at: new Date().toISOString()
+        };
+
+        const { error } = await supabase.from('notices').insert(noticeData);
+        if (error) {
+            console.error('Error adding notice:', error);
+            showToast('Error', 'Publish notice failed: ' + error.message, 'error');
+        } else {
+            setNoticeForm({ title: '', imageUrl: '', expiresAt: '', file: null });
+            showToast('Published', 'Notice uploaded successfully', 'success');
+        }
+    };
+
+    const pruneExpiredNotices = async () => {
+        if (!supabase) return;
+        const expired = notices.filter(n => new Date(n.expires_at) <= new Date());
+        if (expired.length === 0) {
+            alert('No expired notices to clean up!');
+            return;
+        }
+        if (confirm(`Are you sure you want to clean up ${expired.length} expired notices?`)) {
+            for (const notice of expired) {
+                await supabase.from('notices').delete().eq('id', notice.id);
+            }
+            showToast('Cleanup Complete', 'Expired notices pruned successfully', 'success');
+        }
+    };
+
+    // --- COURSE OUTLINES LOGIC ---
+    const handleOutlineFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            if (file.type !== 'application/pdf') {
+                alert('Please upload a PDF file only!');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setOutlineForm(prev => ({
+                    ...prev,
+                    file: file,
+                    outlineUrl: reader.result
+                }));
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleOutlineSubmit = async (e) => {
+        e.preventDefault();
+        if (!supabase) return;
+        if (!outlineForm.outlineUrl) {
+            alert('Please upload a PDF file or paste a direct PDF URL!');
+            return;
+        }
+        if (!outlineForm.courseCode) {
+            alert('Please select a course code!');
+            return;
+        }
+
+        const courseObj = COURSE_DB.find(c => c.code === outlineForm.courseCode);
+        const courseName = courseObj ? courseObj.name : outlineForm.courseCode;
+
+        const outlineData = {
+            course_code: outlineForm.courseCode,
+            course_name: courseName,
+            outline_url: outlineForm.outlineUrl,
+            created_at: new Date().toISOString()
+        };
+
+        const existing = courseOutlines.find(o => o.course_code === outlineForm.courseCode);
+        
+        let error;
+        if (existing) {
+            const { error: err } = await supabase.from('course_outlines').update(outlineData).eq('id', existing.id);
+            error = err;
+        } else {
+            const { error: err } = await supabase.from('course_outlines').insert(outlineData);
+            error = err;
+        }
+
+        if (error) {
+            console.error('Error adding outline:', error);
+            showToast('Error', 'Outline upload failed: ' + error.message, 'error');
+        } else {
+            setOutlineForm({ courseCode: '', courseName: '', outlineUrl: '', file: null });
+            showToast('Published', 'Course outline published successfully', 'success');
         }
     };
 
@@ -777,11 +1072,20 @@ export default function QVaultApp() {
                         </div>
                         <div className="hidden md:flex md:items-center md:space-x-2">
                             <div className="flex items-center bg-slate-100/50 rounded-full p-1 border border-slate-200/50 mr-4">
-                                {['vault', 'materials', 'thesis', 'faculty', 'blood-bank'].map(v => (
-                                    <a key={v} href="#" onClick={(e) => { e.preventDefault(); navigate(v); }} className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${view === v ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-indigo-600 hover:bg-white'}`}>
-                                        {v === 'blood-bank' ? 'Blood Bank' : v.charAt(0).toUpperCase() + v.slice(1)}
-                                    </a>
-                                ))}
+                                {['notices', 'vault', 'materials', 'thesis', 'faculty', 'blood-bank'].map(v => {
+                                    const activeNoticesCount = notices.filter(n => new Date(n.expires_at) > new Date()).length;
+                                    return (
+                                        <a key={v} href="#" onClick={(e) => { e.preventDefault(); navigate(v); }} className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${view === v ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-indigo-600 hover:bg-white'}`}>
+                                            <span>{v === 'blood-bank' ? 'Blood Bank' : v === 'notices' ? 'Notices' : v.charAt(0).toUpperCase() + v.slice(1)}</span>
+                                            {v === 'notices' && activeNoticesCount > 0 && (
+                                                <span className="relative flex h-2 w-2">
+                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                                                </span>
+                                            )}
+                                        </a>
+                                    );
+                                })}
                             </div>
                             {deferredPrompt && (
                                 <button onClick={installPWA} className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors mr-2 shadow-sm">
@@ -796,6 +1100,15 @@ export default function QVaultApp() {
                         <div className="flex items-center md:hidden gap-3">
                             {deferredPrompt && <button onClick={installPWA} className="text-indigo-600 bg-indigo-50 border border-indigo-200 p-2.5 rounded-xl shadow-sm animate-pulse"><i className="fas fa-download"></i></button>}
                             <button onClick={() => { setUploadType('paper'); setShowUploadModal(true); }} className="text-white bg-indigo-600 shadow-indigo-500/30 shadow-md p-2.5 rounded-xl"><i className="fas fa-plus"></i></button>
+                            <button onClick={() => navigate('notices')} className={`p-2.5 rounded-xl border relative ${view === 'notices' ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-slate-200 text-slate-600'}`}>
+                                <i className="fas fa-bullhorn text-sm"></i>
+                                {notices.filter(n => new Date(n.expires_at) > new Date()).length > 0 && (
+                                    <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                                    </span>
+                                )}
+                            </button>
                             <button onClick={() => navigate('vault')} className="text-slate-600 bg-white border border-slate-200 p-2.5 rounded-xl"><i className="fas fa-search"></i></button>
                         </div>
                     </div>
@@ -805,6 +1118,167 @@ export default function QVaultApp() {
             {/* Main Content */}
             <main className="flex-1 overflow-y-auto custom-scrollbar relative bg-slate-50">
                 
+                {/* NOTICES VIEW */}
+                {view === 'notices' && (
+                    <div className="fade-in max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 min-h-full">
+                        {/* Notice Header Section */}
+                        <div className="text-center md:text-left flex flex-col md:flex-row md:items-end justify-between border-b border-slate-200 pb-6 gap-4">
+                            <div>
+                                <div className="inline-flex items-center px-2.5 py-0.5 rounded-full border border-indigo-100 bg-indigo-50 text-indigo-600 text-[10px] font-bold uppercase tracking-wider mb-2">Notice Board</div>
+                                <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">University Announcements</h2>
+                                <p className="text-slate-500 mt-1 text-sm">Stay updated with the latest notices, exam schedules, and academic instructions.</p>
+                            </div>
+                            <div className="flex gap-3 justify-center md:justify-end">
+                                <button onClick={() => navigate('home')} className="px-5 py-2 rounded-xl text-slate-700 bg-white border border-slate-200 hover:border-slate-300 font-bold text-sm shadow-sm transition-all flex items-center gap-2"><i className="fas fa-home"></i> Back to Main</button>
+                                {user && <button onClick={() => { setAdminTab('notices'); navigate('admin'); }} className="px-5 py-2 rounded-xl text-white bg-slate-900 hover:bg-slate-800 font-bold text-sm shadow-md transition-all flex items-center gap-2"><i className="fas fa-plus"></i> Add Notice</button>}
+                            </div>
+                        </div>
+
+                        {(() => {
+                            const activeNotices = notices.filter(n => new Date(n.expires_at) > new Date());
+                            const filteredNotices = activeNotices.filter(n => !noticeSearchQuery || n.title.toLowerCase().includes(noticeSearchQuery.toLowerCase()));
+
+                            return (
+                                <>
+                                    {/* Slider Section */}
+                                    {activeNotices.length > 0 ? (
+                                        <div 
+                                            className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 shadow-xl max-w-4xl mx-auto aspect-[16/9] md:aspect-[21/9] group"
+                                            onMouseEnter={() => setIsNoticeAutoplay(false)}
+                                            onMouseLeave={() => setIsNoticeAutoplay(true)}
+                                        >
+                                            {/* Slides */}
+                                            <div className="relative w-full h-full flex transition-transform duration-500 ease-out" style={{ transform: `translateX(-${currentSlide * 100}%)` }}>
+                                                {activeNotices.map((n, idx) => (
+                                                    <div key={n.id} className="w-full h-full flex-shrink-0 relative cursor-pointer" onClick={() => { setLightboxNotice(n); setShowNoticeLightbox(true); }}>
+                                                        <img src={n.image_url} alt={n.title} className="w-full h-full object-contain bg-slate-950 transition-transform duration-700 group-hover:scale-[1.01]" />
+                                                        {/* Info Overlay */}
+                                                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-4 md:p-6 text-white flex flex-col justify-end">
+                                                            <div className="flex items-center justify-between gap-4">
+                                                                <div>
+                                                                    <h3 className="font-bold text-sm md:text-lg tracking-tight drop-shadow">{n.title || 'Untitled Announcement'}</h3>
+                                                                    <p className="text-[10px] md:text-xs text-slate-300 flex items-center gap-1.5 mt-1">
+                                                                        <i className="fas fa-calendar-alt"></i> Posted: {new Date(n.created_at).toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'})}
+                                                                        <span className="text-slate-500">•</span>
+                                                                        <span className="text-red-400 font-semibold flex items-center gap-1">
+                                                                            <i className="fas fa-clock animate-pulse"></i> 
+                                                                            {(() => {
+                                                                                const diff = new Date(n.expires_at) - new Date();
+                                                                                const hours = Math.floor(diff / (1000 * 60 * 60));
+                                                                                if (hours < 24) {
+                                                                                    return hours <= 0 ? "Expiring shortly" : `Expires in ${hours} hours`;
+                                                                                }
+                                                                                return `Expires in ${Math.ceil(hours / 24)} days`;
+                                                                            })()}
+                                                                        </span>
+                                                                    </p>
+                                                                </div>
+                                                                <span className="text-xs font-bold bg-white/10 backdrop-blur border border-white/20 px-3 py-1.5 rounded-full hover:bg-white/25 transition-colors">
+                                                                    <i className="fas fa-expand-alt mr-1"></i> View Full
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {/* Navigation Chevrons */}
+                                            {activeNotices.length > 1 && (
+                                                <>
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); setCurrentSlide(prev => (prev - 1 + activeNotices.length) % activeNotices.length); }} 
+                                                        className="absolute left-4 top-1/2 -translate-y-1/2 w-9 h-9 md:w-11 md:h-11 rounded-full bg-black/40 backdrop-blur border border-white/15 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 active:scale-95 transition-all shadow-md z-20 hover:bg-black/60"
+                                                    >
+                                                        <i className="fas fa-chevron-left text-sm md:text-base"></i>
+                                                    </button>
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); setCurrentSlide(prev => (prev + 1) % activeNotices.length); }} 
+                                                        className="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 md:w-11 md:h-11 rounded-full bg-black/40 backdrop-blur border border-white/15 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 active:scale-95 transition-all shadow-md z-20 hover:bg-black/60"
+                                                    >
+                                                        <i className="fas fa-chevron-right text-sm md:text-base"></i>
+                                                    </button>
+                                                </>
+                                            )}
+
+                                            {/* Slider Indicator Dots */}
+                                            {activeNotices.length > 1 && (
+                                                <div className="absolute bottom-4 right-6 z-20 flex gap-2">
+                                                    {activeNotices.map((_, idx) => (
+                                                        <button 
+                                                            key={idx} 
+                                                            onClick={(e) => { e.stopPropagation(); setCurrentSlide(idx); }} 
+                                                            className={`w-2 h-2 rounded-full transition-all duration-300 ${currentSlide === idx ? 'bg-indigo-500 w-5' : 'bg-white/40 hover:bg-white/70'}`}
+                                                        ></button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-16 bg-white border border-slate-200/60 rounded-2xl max-w-4xl mx-auto shadow-inner flex flex-col items-center justify-center">
+                                            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 mb-4 border border-slate-200/80"><i className="fas fa-bullhorn text-2xl"></i></div>
+                                            <h3 className="font-extrabold text-slate-800 text-lg">No Active Announcements</h3>
+                                            <p className="text-slate-400 text-sm mt-1 max-w-md">There are no university notices currently active. Check back later or notify an administrator.</p>
+                                        </div>
+                                    )}
+
+                                    {/* Notice Board Search and Grid */}
+                                    {activeNotices.length > 0 && (
+                                        <div className="space-y-6 max-w-5xl mx-auto">
+                                            <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200/70 shadow-sm justify-between">
+                                                <h3 className="font-bold text-slate-800 text-base flex items-center gap-2 self-start sm:self-center"><i className="fas fa-th-large text-indigo-500"></i> All Active Notices ({activeNotices.length})</h3>
+                                                <div className="relative w-full sm:w-80">
+                                                    <i className="fas fa-search absolute left-3 top-3 text-slate-400 text-sm"></i>
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="Search announcements..." 
+                                                        value={noticeSearchQuery}
+                                                        onChange={e => setNoticeSearchQuery(e.target.value)}
+                                                        className="w-full pl-9 pr-4 py-2 border border-slate-200 bg-slate-50/50 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all text-sm"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {filteredNotices.length === 0 ? (
+                                                <div className="text-center py-10 bg-slate-50 border border-dashed border-slate-300 rounded-2xl text-slate-400 text-sm">No notices match your search term.</div>
+                                            ) : (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                                                    {filteredNotices.map(n => (
+                                                        <div key={n.id} className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col group hover:shadow-md hover:border-slate-300 transition-all">
+                                                            <div className="relative aspect-[4/3] bg-slate-950 overflow-hidden cursor-pointer" onClick={() => { setLightboxNotice(n); setShowNoticeLightbox(true); }}>
+                                                                <img src={n.image_url} alt={n.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                                                <div className="absolute inset-0 bg-black/15 group-hover:bg-black/0 transition-colors"></div>
+                                                                <span className="absolute top-3 left-3 bg-red-600 text-white text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full tracking-wider flex items-center gap-1 shadow">
+                                                                    <i className="fas fa-clock animate-pulse"></i> 
+                                                                    {(() => {
+                                                                        const diff = new Date(n.expires_at) - new Date();
+                                                                        const hours = Math.floor(diff / (1000 * 60 * 60));
+                                                                        if (hours < 24) return hours <= 0 ? "Expiring" : `${hours}h left`;
+                                                                        return `${Math.ceil(hours / 24)}d left`;
+                                                                    })()}
+                                                                </span>
+                                                            </div>
+                                                            <div className="p-4 flex flex-col flex-grow justify-between gap-4">
+                                                                <div>
+                                                                    <h4 className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors line-clamp-2">{n.title}</h4>
+                                                                    <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1"><i className="fas fa-calendar-alt"></i> Posted: {new Date(n.created_at).toLocaleDateString()}</p>
+                                                                </div>
+                                                                <div className="flex gap-2">
+                                                                    <button onClick={() => { setLightboxNotice(n); setShowNoticeLightbox(true); }} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5"><i className="fas fa-expand"></i> View</button>
+                                                                    <a href={n.image_url} target="_blank" rel="noopener noreferrer" className="px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center transition-colors shadow-sm" title="Open Image"><i className="fas fa-external-link-alt text-xs"></i></a>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </>
+                            );
+                        })()}
+                    </div>
+                )}
+
                 {/* HOME VIEW */}
                 {view === 'home' && (
                     <div className="fade-in h-full">
@@ -934,26 +1408,49 @@ export default function QVaultApp() {
                                 (!filters.vault.semYear || (p.semester && p.semester.includes(filters.vault.semYear))) &&
                                 (!filters.vault.type || p.type === filters.vault.type) &&
                                 (!filters.vault.course || p.courseCode === filters.vault.course)
-                            ).map(p => (
-                                <div key={p.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 hover:translate-y-[-4px] transition-transform duration-300 flex flex-col overflow-hidden">
-                                    <div className="p-6 flex-1">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700">{p.courseCode}</span>
-                                            <div className="flex gap-2 items-center">
-                                                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full text-white ${p.type === 'lab' ? 'bg-purple-500' : 'bg-emerald-500'}`}>{p.type}</span>
-                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{p.exam}</span>
+                            ).map(p => {
+                                const teacher = teachers.find(x => x.id == p.teacherId);
+                                return (
+                                    <div key={p.id} className="group bg-white rounded-2xl shadow-sm border border-slate-100 hover:translate-y-[-6px] hover:shadow-xl hover:shadow-indigo-500/5 hover:border-indigo-100 transition-all duration-300 flex flex-col overflow-hidden relative">
+                                        <div className={`h-1.5 w-full bg-gradient-to-r ${p.exam?.toLowerCase().includes('mid') ? 'from-amber-400 to-orange-500' : p.exam?.toLowerCase().includes('final') ? 'from-indigo-500 to-blue-600' : 'from-slate-400 to-slate-500'}`}></div>
+                                        <div className="p-6 flex-1">
+                                            <div className="flex justify-between items-start mb-4">
+                                                <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-600 border border-indigo-100/50 tracking-wide">{p.courseCode}</span>
+                                                <div className="flex gap-2 items-center">
+                                                    <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full text-white ${p.type === 'lab' ? 'bg-purple-500 shadow-sm shadow-purple-500/10' : 'bg-emerald-500 shadow-sm shadow-emerald-500/10'}`}>{p.type}</span>
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{p.exam}</span>
+                                                </div>
+                                            </div>
+                                            <h4 className="text-lg font-bold text-slate-900 leading-tight mb-3 group-hover:text-indigo-600 transition-colors line-clamp-2" title={p.courseName}>{p.courseName}</h4>
+                                            <div className="flex items-center gap-2 mb-4 text-xs font-semibold text-slate-500 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100/50 w-fit">
+                                                <i className="far fa-calendar-alt text-indigo-500"></i>
+                                                <span>Semester: {p.semester || 'N/A'}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 pt-2">
+                                                {teacher && teacher.img ? (
+                                                    <img 
+                                                        src={teacher.img} 
+                                                        alt={teacher.name} 
+                                                        className="w-7 h-7 rounded-full object-cover shadow-sm border border-white shrink-0"
+                                                    />
+                                                ) : (
+                                                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center text-[10px] text-indigo-800 font-extrabold shadow-sm border border-white shrink-0">
+                                                        {getTeacherName(p.teacherId).charAt(0)}
+                                                    </div>
+                                                )}
+                                                <div className="min-w-0">
+                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none mb-0.5">Faculty Member</p>
+                                                    <p className="text-xs text-slate-700 font-bold truncate leading-none">{getTeacherName(p.teacherId)}</p>
+                                                </div>
                                             </div>
                                         </div>
-                                        <h4 className="text-lg font-bold text-slate-900 leading-tight mb-2">{p.courseName}</h4>
-                                        <div className="flex items-center gap-2 mb-4"><i className="far fa-calendar text-slate-400 text-xs"></i><span className="text-sm text-slate-600 font-bold">{p.semester || 'N/A'}</span></div>
-                                        <div className="flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-[10px] text-indigo-700 font-bold">{getTeacherName(p.teacherId).charAt(0)}</div><span className="text-xs text-slate-700 font-bold truncate">Faculty: {getTeacherName(p.teacherId)}</span></div>
+                                        <div className="bg-slate-50/50 px-6 py-4 border-t border-slate-100 flex gap-3 w-full">
+                                            <button onClick={() => { setPreviewUrl(p.fileUrl); setShowPreviewModal(true); }} className="flex-1 bg-white border border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50 text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-all flex items-center justify-center gap-2"><i className="fas fa-eye text-indigo-500 text-xs"></i> Preview Paper</button>
+                                            <button onClick={(e) => { e.stopPropagation(); window.open(p.fileUrl, '_blank'); }} className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-md shadow-indigo-500/10 hover:shadow-lg transition-all flex items-center justify-center gap-2" title="Download PDF"><i className="fas fa-download text-xs"></i> Download</button>
+                                        </div>
                                     </div>
-                                    <div className="bg-slate-50/50 px-6 py-4 border-t border-slate-100 flex justify-between items-center">
-                                        <button onClick={() => { setPreviewUrl(p.fileUrl); setShowPreviewModal(true); }} className="text-sm text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-2"><i className="fas fa-eye"></i> Preview</button>
-                                        <button onClick={(e) => { e.stopPropagation(); window.open(p.fileUrl, '_blank'); }} className="text-slate-400 hover:text-slate-600"><i className="fas fa-download"></i></button>
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 )}
@@ -987,23 +1484,65 @@ export default function QVaultApp() {
                                 (!filters.materials.teacher || p.teacherId == filters.materials.teacher) &&
                                 (!filters.materials.course || p.courseCode == filters.materials.course) &&
                                 (!filters.materials.type || p.type === filters.materials.type)
-                            ).map(p => (
-                                <div key={p.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 hover:translate-y-[-4px] transition-transform duration-300 flex flex-col overflow-hidden">
-                                    <div className="p-6 flex-1">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700">{p.courseCode}</span>
-                                            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full text-white ${p.type === 'slide' ? 'bg-amber-500' : p.type === 'book' ? 'bg-pink-500' : 'bg-blue-500'}`}>{p.type}</span>
+                            ).map(p => {
+                                const teacher = teachers.find(x => x.id == p.teacherId);
+                                return (
+                                    <div key={p.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 hover:translate-y-[-4px] transition-transform duration-300 flex flex-col overflow-hidden">
+                                        <div className="p-6 flex-1">
+                                            <div className="flex justify-between items-start mb-4">
+                                                <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700">{p.courseCode}</span>
+                                                <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full text-white ${p.type === 'course_link' ? 'bg-emerald-500 shadow-sm shadow-emerald-500/10' : p.type === 'slide' ? 'bg-amber-500' : p.type === 'book' ? 'bg-pink-500' : 'bg-blue-500'}`}>
+                                                    {p.type === 'course_link' ? 'Course Link' : p.type === 'slide' ? 'Slide' : p.type === 'book' ? 'Book' : p.type === 'note' ? 'Note' : p.type}
+                                                </span>
+                                            </div>
+                                            <h4 className="text-lg font-bold text-slate-900 leading-tight mb-2">{p.courseName}</h4>
+                                            <div className="flex items-center gap-2 mb-4"><i className="far fa-clock text-slate-400 text-xs"></i><span className="text-sm text-slate-600 font-bold">Sem: {p.semester || 'N/A'}</span></div>
+                                            <div className="flex items-center gap-2">
+                                                {teacher && teacher.img ? (
+                                                    <img 
+                                                        src={teacher.img} 
+                                                        alt={teacher.name} 
+                                                        className="w-6 h-6 rounded-full object-cover shadow-sm border border-white shrink-0"
+                                                    />
+                                                ) : (
+                                                    <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] text-slate-600 font-bold shrink-0">
+                                                        <i className="fas fa-user text-[10px]"></i>
+                                                    </div>
+                                                )}
+                                                <span className="text-xs text-slate-700 font-bold truncate">Faculty: {getTeacherName(p.teacherId)}</span>
+                                            </div>
                                         </div>
-                                        <h4 className="text-lg font-bold text-slate-900 leading-tight mb-2">{p.courseName}</h4>
-                                        <div className="flex items-center gap-2 mb-4"><i className="far fa-clock text-slate-400 text-xs"></i><span className="text-sm text-slate-600 font-bold">Sem: {p.semester || 'N/A'}</span></div>
-                                        <div className="flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] text-slate-600 font-bold"><i className="fas fa-user"></i></div><span className="text-xs text-slate-700 font-bold truncate">Faculty: {getTeacherName(p.teacherId)}</span></div>
+                                        <div className="bg-slate-50/50 px-6 py-4 border-t border-slate-100 flex gap-3 w-full">
+                                            {p.type === 'course_link' ? (
+                                                <a 
+                                                    href={p.fileUrl} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer" 
+                                                    className="w-full text-center bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-md shadow-emerald-500/10 hover:shadow-lg hover:shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 transform hover:-translate-y-0.5"
+                                                >
+                                                    <i className="fas fa-external-link-alt text-sm"></i> Access Recommended Link
+                                                </a>
+                                            ) : (
+                                                <>
+                                                    <button 
+                                                        onClick={() => { setPreviewUrl(p.fileUrl); setShowPreviewModal(true); }} 
+                                                        className="flex-1 bg-white border border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50 text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-all flex items-center justify-center gap-2"
+                                                    >
+                                                        <i className="fas fa-eye text-indigo-500 text-xs"></i> Preview
+                                                    </button>
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); window.open(p.fileUrl, '_blank'); }} 
+                                                        className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-md shadow-indigo-500/10 hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                                                        title="Download PDF"
+                                                    >
+                                                        <i className="fas fa-download text-xs"></i> Download
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="bg-slate-50/50 px-6 py-4 border-t border-slate-100 flex justify-between items-center">
-                                        <button onClick={() => { setPreviewUrl(p.fileUrl); setShowPreviewModal(true); }} className="text-sm text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-2"><i className="fas fa-eye"></i> Preview</button>
-                                        <button onClick={(e) => { e.stopPropagation(); window.open(p.fileUrl, '_blank'); }} className="text-slate-400 hover:text-slate-600"><i className="fas fa-download"></i></button>
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 )}
@@ -1028,22 +1567,40 @@ export default function QVaultApp() {
                                 const dynamicCourses = [...new Set(papers.filter(p => p.dept === courseListDept).map(p => JSON.stringify({ code: p.courseCode, name: p.courseName })))].map(s => JSON.parse(s));
                                 const allCourses = [...staticCourses, ...dynamicCourses].filter((v,i,a)=>a.findIndex(t=>(t.code === v.code))===i).sort((a,b) => a.code.localeCompare(b.code));
 
-                                return allCourses.map((c, i) => (
-                                    <div key={i} onClick={() => { setFilters(prev => ({ ...prev, vault: { ...prev.vault, search: c.code } })); navigate('vault'); }} className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between">
-                                        <div>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{c.code}</span>
-                                                <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{c.credits ? `${c.credits} Cr` : 'N/A'}</span>
+                                return allCourses.map((c, i) => {
+                                    const outline = courseOutlines.find(o => o.course_code === c.code);
+                                    return (
+                                        <div key={i} onClick={() => { setFilters(prev => ({ ...prev, vault: { ...prev.vault, search: c.code } })); navigate('vault'); }} className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between">
+                                            <div>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{c.code}</span>
+                                                    <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{c.credits ? `${c.credits} Cr` : 'N/A'}</span>
+                                                </div>
+                                                <h3 className="font-bold text-slate-800 mb-2">{c.name}</h3>
+                                                {c.pre && (
+                                                    <div className="mt-2 pt-2 border-t border-slate-50">
+                                                        <p className="text-xs text-slate-500"><span className="font-bold text-slate-400 uppercase">Pre-req:</span> {c.pre}</p>
+                                                    </div>
+                                                )}
                                             </div>
-                                            <h3 className="font-bold text-slate-800 mb-2">{c.name}</h3>
+                                            {outline && (
+                                                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                                                    <button 
+                                                        onClick={(e) => { 
+                                                            e.stopPropagation(); 
+                                                            setPreviewUrl(outline.outline_url); 
+                                                            setShowPreviewModal(true); 
+                                                        }} 
+                                                        className="inline-flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 px-3.5 py-2 rounded-xl text-xs font-bold transition-all w-full justify-center shadow-sm active:scale-95 transform"
+                                                    >
+                                                        <i className="fas fa-file-pdf text-sm animate-pulse"></i>
+                                                        <span>Course Outline</span>
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
-                                        {c.pre && (
-                                            <div className="mt-2 pt-2 border-t border-slate-50">
-                                                <p className="text-xs text-slate-500"><span className="font-bold text-slate-400 uppercase">Pre-req:</span> {c.pre}</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                ));
+                                    );
+                                });
                             })()}
                         </div>
                     </div>
@@ -1059,31 +1616,65 @@ export default function QVaultApp() {
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                             {thesisPapers.length === 0 ? (
                                 <div className="col-span-full py-20 text-center"><p className="text-slate-400 text-sm">No thesis papers uploaded yet. Click the Upload button to add one.</p></div>
-                            ) : thesisPapers.map(t => (
-                                <div key={t.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 hover:translate-y-[-4px] transition-transform duration-300 flex flex-col overflow-hidden">
-                                    <div className="p-6 flex-1">
-                                        <div className="flex justify-between items-start mb-3"><span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-purple-100 text-purple-700">{t.year || 'N/A'}</span><span className="text-xs text-slate-500">{t.dept}</span></div>
-                                        <h4 className="text-lg font-bold text-slate-900 leading-tight mb-3 line-clamp-2">{t.title}</h4>
-                                        <div className="flex items-center gap-2 mb-2"><i className="fas fa-user text-slate-400 text-xs"></i><span className="text-sm text-slate-600">{t.author}</span></div>
-                                        <div className="flex items-center gap-2 mb-2"><i className="fas fa-id-card text-slate-400 text-xs"></i><span className="text-xs text-slate-500">Student ID: {t.studentid || t.studentId || 'N/A'}</span></div>
-                                        <div className="flex items-center gap-2 mb-2"><i className="fas fa-user-tie text-slate-400 text-xs"></i><span className="text-xs text-slate-500">Supervisor: {getTeacherName(t.supervisorid || t.supervisorId)}</span></div>
-                                        <div className="flex gap-2 mb-3">
-                                            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full text-white ${t.type === 'project' ? 'bg-blue-500' : 'bg-purple-500'}`}>{t.type || 'thesis'}</span>
-                                            {t.category && <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full text-white ${t.category === 'lab' ? 'bg-pink-500' : 'bg-indigo-500'}`}>{t.category}</span>}
+                            ) : thesisPapers.map(t => {
+                                const { abstract, keywords, slidesLink } = parseThesisAbstract(t.abstract);
+                                return (
+                                    <div key={t.id} className="group bg-white rounded-2xl shadow-sm border border-slate-100 hover:translate-y-[-6px] hover:shadow-xl hover:shadow-purple-500/5 hover:border-purple-100 transition-all duration-300 flex flex-col overflow-hidden relative">
+                                        <div className={`h-1.5 w-full bg-gradient-to-r ${t.type === 'project' ? 'from-blue-500 to-cyan-500' : 'from-purple-500 to-pink-500'}`}></div>
+                                        <div className="p-6 flex-1">
+                                            <div className="flex justify-between items-start mb-3">
+                                                <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-purple-50 text-purple-700 border border-purple-100/50 shadow-sm">{t.year || 'N/A'}</span>
+                                                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">{t.dept}</span>
+                                            </div>
+                                            <h4 className="text-lg font-black text-slate-900 leading-tight mb-3 group-hover:text-purple-700 transition-colors line-clamp-2" title={t.title}>{t.title}</h4>
+                                            
+                                            <div className="space-y-1.5 mb-4">
+                                                <div className="flex items-center gap-2 text-slate-600"><i className="fas fa-users text-purple-400 text-xs w-4"></i><span className="text-sm font-semibold">{t.author}</span></div>
+                                                <div className="flex items-center gap-2 text-slate-500"><i className="fas fa-id-card text-slate-400 text-xs w-4"></i><span className="text-xs">ID: {t.studentid || t.studentId || 'N/A'}</span></div>
+                                                <div className="flex items-center gap-2 text-slate-500"><i className="fas fa-chalkboard-teacher text-slate-400 text-xs w-4"></i><span className="text-xs">Supervisor: {getTeacherName(t.supervisorid || t.supervisorId)}</span></div>
+                                            </div>
+
+                                            <div className="flex gap-2 mb-4">
+                                                <span className={`text-[9px] font-extrabold uppercase px-2.5 py-0.5 rounded-full text-white ${t.type === 'project' ? 'bg-blue-500 shadow-sm shadow-blue-500/10' : 'bg-purple-500 shadow-sm shadow-purple-500/10'}`}>{t.type || 'thesis'}</span>
+                                                {t.category && <span className={`text-[9px] font-extrabold uppercase px-2.5 py-0.5 rounded-full text-white ${t.category === 'lab' ? 'bg-pink-500' : 'bg-indigo-500'}`}>{t.category}</span>}
+                                            </div>
+                                            
+                                            {abstract && (
+                                                <p className="text-xs text-slate-500 line-clamp-3 mt-3 italic bg-slate-50/50 p-3 rounded-2xl border border-slate-100 relative overflow-hidden font-serif">
+                                                    "{abstract}"
+                                                </p>
+                                            )}
+                                            
+                                            {keywords && (
+                                                <div className="flex flex-wrap gap-1.5 mt-3.5">
+                                                    {keywords.split(',').map((kw, i) => (
+                                                        <span key={i} className="text-[10px] bg-purple-50 text-purple-600 hover:bg-purple-100 px-2 py-0.5 rounded-md font-semibold tracking-wide border border-purple-100/50 transition-colors">
+                                                            #{kw.trim()}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            <div className="flex flex-wrap gap-4 mt-4 pt-3.5 border-t border-slate-100">
+                                                {(t.project_link || t.projectLink) && (
+                                                    <a href={t.project_link || t.projectLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-indigo-600 font-bold hover:text-indigo-800 hover:underline transition-all">
+                                                        <i className="fas fa-code text-indigo-400"></i> View Project
+                                                    </a>
+                                                )}
+                                                {slidesLink && (
+                                                    <a href={slidesLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-amber-600 font-bold hover:text-amber-800 hover:underline transition-all">
+                                                        <i className="fas fa-play-circle text-amber-400"></i> View Slides
+                                                    </a>
+                                                )}
+                                            </div>
                                         </div>
-                                        {t.abstract && <p className="text-xs text-slate-500 line-clamp-2 mt-2 italic">{t.abstract}</p>}
-                                        {(t.project_link || t.projectLink) && (
-                                            <a href={t.project_link || t.projectLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-600 font-bold mt-2 hover:underline">
-                                                <i className="fas fa-link"></i> View Project
-                                            </a>
-                                        )}
+                                        <div className="bg-slate-50/60 px-6 py-4 border-t border-slate-100 flex gap-3 w-full">
+                                            <button onClick={() => { setPreviewUrl(t.fileurl || t.fileUrl); setShowPreviewModal(true); }} className="flex-1 bg-white border border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50 text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-all flex items-center justify-center gap-2"><i className="fas fa-eye text-purple-500 text-xs"></i> Preview Abstract</button>
+                                            <button onClick={() => window.open(t.fileurl || t.fileUrl, '_blank')} className="bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-md shadow-purple-500/10 hover:shadow-lg transition-all flex items-center justify-center gap-2" title="Download PDF"><i className="fas fa-download text-xs"></i> Download</button>
+                                        </div>
                                     </div>
-                                    <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex justify-between items-center">
-                                        <button onClick={() => { setPreviewUrl(t.fileurl || t.fileUrl); setShowPreviewModal(true); }} className="text-sm text-purple-600 hover:text-purple-800 font-semibold flex items-center gap-2"><i className="fas fa-eye"></i> Preview</button>
-                                        <button onClick={() => window.open(t.fileurl || t.fileUrl, '_blank')} className="text-slate-400 hover:text-slate-600"><i className="fas fa-download"></i></button>
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 )}
@@ -1126,15 +1717,35 @@ export default function QVaultApp() {
                                 return (designationRank[a.designation] || 99) - (designationRank[b.designation] || 99);
                             })
                             .map(t => (
-                                <div key={t.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 flex flex-col items-center text-center hover:translate-y-[-4px] transition-all duration-300 cursor-pointer group" onClick={() => { setTeacherProfileId(t.id); navigate('teacher-profile'); }}>
-                                    <div className="relative w-28 h-28 mb-5">
-                                        <div className="absolute inset-0 bg-indigo-100 rounded-full blur-lg opacity-50 group-hover:opacity-75 transition-opacity"></div>
-                                        <img className="relative w-28 h-28 rounded-full object-cover border-4 border-white shadow-md" src={t.img || 'https://via.placeholder.com/150'} alt={t.name} />
+                                <div 
+                                    key={t.id} 
+                                    className="group bg-white rounded-2xl shadow-sm border border-slate-100 hover:translate-y-[-6px] hover:shadow-xl hover:shadow-indigo-500/5 hover:border-indigo-100/80 transition-all duration-300 cursor-pointer overflow-hidden flex flex-col items-center text-center" 
+                                    onClick={() => { setTeacherProfileId(t.id); navigate('teacher-profile'); }}
+                                >
+                                    <div className={`h-16 w-full bg-gradient-to-r ${t.dept?.toLowerCase().includes('computer') ? 'from-violet-500 to-indigo-600' : t.dept?.toLowerCase().includes('business') ? 'from-emerald-500 to-teal-600' : 'from-slate-500 to-slate-700'}`}></div>
+                                    
+                                    <div className="relative w-24 h-24 -mt-12 mb-4 z-10">
+                                        <div className="absolute inset-0 bg-indigo-500 rounded-full blur-md opacity-20 group-hover:opacity-40 transition-opacity duration-300"></div>
+                                        <img 
+                                            className="relative w-24 h-24 rounded-full object-cover border-4 border-white shadow-md group-hover:scale-105 group-hover:ring-4 group-hover:ring-indigo-500/15 transition-all duration-500" 
+                                            src={t.img || 'https://via.placeholder.com/150'} 
+                                            alt={t.name} 
+                                        />
                                     </div>
-                                    <h3 className="text-lg font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{t.name}</h3>
-                                    <p className="text-xs font-bold text-indigo-500 uppercase tracking-wide mt-1">{t.dept}</p>
-                                    <p className="text-sm text-slate-400 mt-2 line-clamp-2">{t.designation}</p>
-                                    <button className="mt-6 text-xs font-bold text-indigo-600 bg-indigo-50 px-6 py-2.5 rounded-full group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-sm">View Profile</button>
+                                    
+                                    <div className="px-6 pb-6 flex-1 flex flex-col justify-between items-center w-full">
+                                        <div className="mb-4">
+                                            <h3 className="text-base font-extrabold text-slate-900 group-hover:text-indigo-600 transition-colors leading-snug">{t.name}</h3>
+                                            <span className="inline-block tracking-widest text-[9px] px-2.5 py-0.5 rounded-full font-bold bg-indigo-50 text-indigo-600 border border-indigo-100/50 uppercase mt-2 w-max">
+                                                {t.dept}
+                                            </span>
+                                            <p className="text-xs font-semibold text-slate-400 mt-2 line-clamp-1 italic">{t.designation}</p>
+                                        </div>
+                                        
+                                        <button className="mt-auto w-full text-center text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-600 hover:text-white px-5 py-2.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 transform group-hover:scale-[1.02]">
+                                            <i className="fas fa-id-card text-xs"></i> View Full Profile
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -1236,11 +1847,13 @@ export default function QVaultApp() {
                         </div>
                         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden flex flex-col flex-1">
                             <div className="flex border-b border-slate-200 overflow-x-auto">
-                                {['uploads', 'mat_uploads', 'thesis_uploads', 'papers', 'materials', 'thesis', 'faculty', 'blood'].map(tab => {
+                                {['uploads', 'mat_uploads', 'thesis_uploads', 'notices', 'outlines', 'papers', 'materials', 'thesis', 'faculty', 'blood'].map(tab => {
                                     const names = { 
                                         uploads: 'Pending Questions', 
                                         mat_uploads: 'Pending Materials', 
                                         thesis_uploads: 'Pending Thesis',
+                                        notices: 'Notice Board',
+                                        outlines: 'Course Outlines',
                                         papers: 'Questions', 
                                         materials: 'Materials', 
                                         thesis: 'Thesis',
@@ -1312,21 +1925,70 @@ export default function QVaultApp() {
                                     {pendingThesis.length === 0 ? (
                                         <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-400 text-sm">No pending thesis papers.</div>
                                     ) : (
-                                        <div className="space-y-3">
-                                            {pendingThesis.map(t => ({...t, _type: 'thesis'})).map(item => (
-                                                <div key={item.id} className="flex items-center justify-between p-4 bg-amber-50 border border-amber-100 rounded-xl">
-                                                    <div>
-                                                        <div className="font-bold text-slate-800 text-sm"><span className="uppercase text-[10px] bg-white border border-amber-200 px-1.5 py-0.5 rounded text-amber-600 mr-2 font-extrabold tracking-wider">THESIS</span> {item.title}</div>
-                                                        <div className="text-xs text-slate-500 mt-1">{item.dept} • {item.year} • {item.author}</div>
-                                                        <div className="text-xs text-slate-500">Supervisor: {getTeacherName(item.supervisorid || item.supervisorId)}</div>
-                                                        <a href={item.fileurl || item.fileUrl} target="_blank" className="text-xs text-indigo-600 hover:underline mt-1 block">View File</a>
+                                        <div className="space-y-4">
+                                            {pendingThesis.map(t => ({...t, _type: 'thesis'})).map(item => {
+                                                const { abstract, keywords, slidesLink } = parseThesisAbstract(item.abstract);
+                                                return (
+                                                    <div key={item.id} className="p-5 bg-amber-50/60 border border-amber-100 rounded-2xl flex flex-col md:flex-row md:items-start justify-between gap-4">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="font-bold text-slate-900 text-base leading-snug flex items-start gap-2 flex-wrap">
+                                                                <span className="uppercase text-[9px] bg-amber-200 border border-amber-300 px-2 py-0.5 rounded-md text-amber-800 font-extrabold tracking-wider mt-0.5">THESIS UPLOAD</span> 
+                                                                {item.title}
+                                                            </div>
+                                                            <div className="text-xs text-slate-600 mt-2 font-medium flex flex-wrap items-center gap-x-3 gap-y-1">
+                                                                <span><i className="fas fa-graduation-cap text-slate-400 mr-1"></i> {item.dept}</span>
+                                                                <span>•</span>
+                                                                <span><i className="fas fa-calendar-alt text-slate-400 mr-1"></i> {item.semester} {item.year}</span>
+                                                                <span>•</span>
+                                                                <span><i className="fas fa-users text-slate-400 mr-1"></i> {item.author}</span>
+                                                                <span>•</span>
+                                                                <span><i className="fas fa-id-card text-slate-400 mr-1"></i> ID: {item.studentid || item.studentId || 'N/A'}</span>
+                                                            </div>
+                                                            <div className="text-xs text-slate-600 mt-1 font-medium">
+                                                                <i className="fas fa-user-tie text-slate-400 mr-1.5"></i> Supervisor: {getTeacherName(item.supervisorid || item.supervisorId)}
+                                                            </div>
+                                                            
+                                                            {abstract && (
+                                                                <div className="mt-3 bg-white/70 border border-amber-100/55 rounded-xl p-3 text-xs text-slate-600">
+                                                                    <div className="font-bold text-slate-700 mb-1">Abstract:</div>
+                                                                    <p className="italic line-clamp-3">{abstract}</p>
+                                                                </div>
+                                                            )}
+
+                                                            {keywords && (
+                                                                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                                                                    <span className="text-[10px] text-slate-400 font-bold self-center mr-1">Keywords:</span>
+                                                                    {keywords.split(',').map((kw, idx) => (
+                                                                        <span key={idx} className="text-[10px] bg-amber-100/80 text-amber-800 px-2 py-0.5 rounded-md font-semibold">
+                                                                            #{kw.trim()}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+
+                                                            <div className="mt-3 pt-3 border-t border-amber-200/50 flex flex-wrap gap-4 text-xs font-semibold">
+                                                                <a href={item.fileurl || item.fileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 transition-colors">
+                                                                    <i className="fas fa-file-pdf"></i> View Submitted PDF
+                                                                </a>
+                                                                {(item.project_link || item.projectLink) && (
+                                                                    <a href={item.project_link || item.projectLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-teal-600 hover:text-teal-800 transition-colors">
+                                                                        <i className="fas fa-code"></i> Project Demo/Code
+                                                                    </a>
+                                                                )}
+                                                                {slidesLink && (
+                                                                    <a href={slidesLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-amber-700 hover:text-amber-900 transition-colors">
+                                                                        <i className="fas fa-play-circle"></i> Presentation Slides
+                                                                    </a>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex md:flex-col gap-2 shrink-0 justify-end mt-2 md:mt-0 self-center">
+                                                            <button onClick={() => approveItem(item, 'thesis')} className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-emerald-600 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-md shadow-emerald-500/10">Approve</button>
+                                                            <button onClick={() => rejectItem(item.id, 'thesis')} className="bg-red-500 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-600 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-md shadow-red-500/10">Reject</button>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex gap-2">
-                                                        <button onClick={() => approveItem(item, 'thesis')} className="bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-600 shadow-sm">Approve</button>
-                                                        <button onClick={() => rejectItem(item.id, 'thesis')} className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-600 shadow-sm">Reject</button>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     )}
                                 </div>
@@ -1411,6 +2073,7 @@ export default function QVaultApp() {
                                                 <tr>
                                                     <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Title / Author</th>
                                                     <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Dept / Year</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Links</th>
                                                     <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Action</th>
                                                 </tr>
                                             </thead>
@@ -1421,11 +2084,33 @@ export default function QVaultApp() {
                                                 .map(item => {
                                                     console.log('Thesis Item:', item);
                                                     console.log('Teachers Count:', teachers.length);
+                                                    const { keywords, slidesLink } = parseThesisAbstract(item.abstract);
                                                     return (
-                                                    <tr key={item.id} className="hover:bg-slate-50">
-                                                        <td className="px-6 py-4 whitespace-nowrap"><div className="text-sm font-bold text-slate-900 truncate max-w-xs" title={item.title}>{item.title}</div><div className="text-xs text-slate-500">{item.author}</div></td>
-                                                        <td className="px-6 py-4 whitespace-nowrap"><div className="text-sm text-slate-900">{item.dept}</div><div className="text-xs text-slate-500">{item.year} • {getTeacherName(item.supervisorid || item.supervisorId)}</div></td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"><button onClick={() => deleteItem(item.id, 'thesis_papers')} className="text-red-400 hover:text-red-600"><i className="fas fa-trash-alt"></i></button></td>
+                                                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                                                        <td className="px-6 py-4"><div className="text-sm font-bold text-slate-950 truncate max-w-xs md:max-w-md" title={item.title}>{item.title}</div><div className="text-xs text-slate-500 font-medium flex items-center gap-2 mt-0.5"><span>By: {item.author}</span>{item.studentid && <span>• ID: {item.studentid}</span>}</div></td>
+                                                        <td className="px-6 py-4 whitespace-nowrap"><div className="text-sm font-medium text-slate-700">{item.dept}</div><div className="text-xs text-slate-400 mt-0.5">{item.year} • {getTeacherName(item.supervisorid || item.supervisorId)}</div></td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <div className="flex gap-3 text-xs">
+                                                                <a href={item.fileurl || item.fileUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline flex items-center gap-1 font-bold" title="PDF Document">
+                                                                    <i className="fas fa-file-pdf"></i> PDF
+                                                                </a>
+                                                                {(item.project_link || item.projectLink) && (
+                                                                    <a href={item.project_link || item.projectLink} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline flex items-center gap-1 font-bold" title="Project Code/Demo">
+                                                                        <i className="fas fa-code"></i> Code
+                                                                    </a>
+                                                                )}
+                                                                {slidesLink && (
+                                                                    <a href={slidesLink} target="_blank" rel="noopener noreferrer" className="text-amber-600 hover:underline flex items-center gap-1 font-bold" title="Presentation Slides">
+                                                                        <i className="fas fa-play-circle"></i> Slides
+                                                                    </a>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                            <button onClick={() => deleteItem(item.id, 'thesis_papers')} className="text-red-400 hover:text-red-600 hover:scale-110 active:scale-95 transition-transform p-1" title="Delete Thesis">
+                                                                <i className="fas fa-trash-alt"></i>
+                                                            </button>
+                                                        </td>
                                                     </tr>
                                                     );
                                                 })}
@@ -1503,6 +2188,295 @@ export default function QVaultApp() {
                                     </div>
                                 </div>
                             )}
+
+                            {/* NOTICES ADMIN TAB */}
+                            {adminTab === 'notices' && (
+                                <div className="p-6 overflow-y-auto">
+                                    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                            {/* Left Panel: Upload Notice Form */}
+                                            <div className="lg:col-span-1 bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 flex flex-col gap-5">
+                                                <div>
+                                                    <h3 className="font-extrabold text-slate-800 text-lg flex items-center gap-2"><i className="fas fa-plus-circle text-indigo-500"></i> Add New Notice</h3>
+                                                    <p className="text-xs text-slate-400 mt-1">Publish an announcement image with automated expiry.</p>
+                                                </div>
+                                                
+                                                <form onSubmit={handleNoticeSubmit} className="space-y-4">
+                                                    <div>
+                                                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Notice Title *</label>
+                                                        <input 
+                                                            type="text" 
+                                                            required
+                                                            placeholder="e.g. Midterm Exam Schedule Fall 2025" 
+                                                            value={noticeForm.title}
+                                                            onChange={e => setNoticeForm(prev => ({ ...prev, title: e.target.value }))}
+                                                            className="w-full px-4 py-2.5 border border-slate-200 bg-slate-50/50 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all text-sm shadow-sm"
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Notice Image File *</label>
+                                                        <div className="relative border-2 border-dashed border-slate-200 hover:border-indigo-500/50 rounded-xl p-4 text-center cursor-pointer transition-all bg-slate-50/30 group">
+                                                            <input 
+                                                                type="file" 
+                                                                accept="image/*"
+                                                                onChange={handleNoticeFileChange}
+                                                                className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                                                            />
+                                                            <div className="flex flex-col items-center justify-center gap-1">
+                                                                <i className="fas fa-image text-slate-400 group-hover:text-indigo-500 text-xl transition-colors"></i>
+                                                                <span className="text-xs text-slate-600 font-medium">Click to select notice image</span>
+                                                                <span className="text-[10px] text-slate-400">PNG, JPG or JPEG format</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-center gap-3">
+                                                        <span className="h-px bg-slate-200 flex-grow"></span> OR <span className="h-px bg-slate-200 flex-grow"></span>
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Notice Image URL</label>
+                                                        <input 
+                                                            type="url" 
+                                                            placeholder="e.g. https://catbox.moe/notice.png" 
+                                                            value={noticeForm.imageUrl}
+                                                            onChange={e => setNoticeForm(prev => ({ ...prev, imageUrl: e.target.value }))}
+                                                            className="w-full px-4 py-2.5 border border-slate-200 bg-slate-50/50 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all text-sm shadow-sm font-mono text-xs"
+                                                        />
+                                                    </div>
+
+                                                    {noticeForm.imageUrl && (
+                                                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3 animate-in fade-in">
+                                                            <div className="w-12 h-12 rounded-lg bg-slate-950 overflow-hidden border border-slate-200 flex-shrink-0">
+                                                                <img src={noticeForm.imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                                                            </div>
+                                                            <div className="overflow-hidden">
+                                                                <p className="text-[10px] text-green-600 font-extrabold uppercase tracking-wide flex items-center gap-1"><i className="fas fa-check-circle"></i> Image Loaded</p>
+                                                                <p className="text-[9px] text-slate-400 truncate max-w-xs">{noticeForm.file ? noticeForm.file.name : noticeForm.imageUrl}</p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    <div>
+                                                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Validation Time (Expires At) *</label>
+                                                        <input 
+                                                            type="datetime-local" 
+                                                            required
+                                                            value={noticeForm.expiresAt}
+                                                            onChange={e => setNoticeForm(prev => ({ ...prev, expiresAt: e.target.value }))}
+                                                            className="w-full px-4 py-2.5 border border-slate-200 bg-slate-50/50 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all text-sm shadow-sm"
+                                                        />
+                                                    </div>
+
+                                                    <button 
+                                                        type="submit" 
+                                                        className="w-full py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-bold rounded-xl transition-all shadow-md shadow-indigo-600/10 hover:shadow-lg hover:shadow-indigo-600/20 active:scale-95 transform flex items-center justify-center gap-2 mt-2"
+                                                    >
+                                                        <i className="fas fa-cloud-upload-alt animate-bounce"></i> Publish Notice
+                                                    </button>
+                                                </form>
+                                            </div>
+
+                                            {/* Right Panel: All Notices List */}
+                                            <div className="lg:col-span-2 space-y-6">
+                                                <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                                    <div>
+                                                        <h3 className="font-extrabold text-slate-800 text-lg flex items-center gap-2"><i className="fas fa-bullhorn text-indigo-500"></i> Manage Notices ({notices.length})</h3>
+                                                        <p className="text-xs text-slate-400 mt-1">Review active notice timelines or perform cleanups.</p>
+                                                    </div>
+                                                    <button onClick={pruneExpiredNotices} className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2"><i className="fas fa-broom text-amber-500"></i> Clean Expired Notices</button>
+                                                </div>
+
+                                                {notices.length === 0 ? (
+                                                    <div className="text-center py-16 bg-white border border-slate-200 rounded-2xl shadow-inner text-slate-400 text-sm">No notices currently recorded in database.</div>
+                                                ) : (
+                                                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                                                        <div className="overflow-x-auto">
+                                                            <table className="w-full text-sm text-left">
+                                                                <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500 tracking-wider border-b border-slate-100">
+                                                                    <tr>
+                                                                        <th className="px-6 py-4">Notice Title</th>
+                                                                        <th className="px-6 py-4">Published</th>
+                                                                        <th className="px-6 py-4">Expires</th>
+                                                                        <th className="px-6 py-4">Status</th>
+                                                                        <th className="px-6 py-4 text-right">Action</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-slate-100">
+                                                                    {notices.map(n => {
+                                                                        const isActive = new Date(n.expires_at) > new Date();
+                                                                        return (
+                                                                            <tr key={n.id} className="hover:bg-slate-50/50 transition-colors">
+                                                                                <td className="px-6 py-4 font-semibold text-slate-800 text-xs">
+                                                                                    <div className="flex items-center gap-3">
+                                                                                        <div className="w-8 h-8 rounded bg-slate-900 border border-slate-200 overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => { setLightboxNotice(n); setShowNoticeLightbox(true); }} title="Expand">
+                                                                                            <img src={n.image_url} alt={n.title} className="w-full h-full object-cover" />
+                                                                                        </div>
+                                                                                        <span className="truncate max-w-[200px]">{n.title}</span>
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td className="px-6 py-4 text-slate-500 text-xs">{new Date(n.created_at).toLocaleDateString()}</td>
+                                                                                <td className="px-6 py-4 text-slate-500 text-xs">{new Date(n.expires_at).toLocaleString()}</td>
+                                                                                <td className="px-6 py-4">
+                                                                                    {isActive ? (
+                                                                                        <span className="inline-flex items-center gap-1 bg-green-50 border border-green-200 text-green-700 px-2 py-0.5 rounded-full text-[9px] font-extrabold tracking-wide uppercase"><i className="fas fa-check-circle text-[8px]"></i> Active</span>
+                                                                                    ) : (
+                                                                                        <span className="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 text-slate-400 px-2 py-0.5 rounded-full text-[9px] font-extrabold tracking-wide uppercase"><i className="fas fa-hourglass-end text-[8px]"></i> Expired</span>
+                                                                                    )}
+                                                                                </td>
+                                                                                <td className="px-6 py-4 text-right">
+                                                                                    <button onClick={() => { setLightboxNotice(n); setShowNoticeLightbox(true); }} className="text-indigo-500 hover:bg-indigo-50 p-2 rounded-lg transition-colors mr-1" title="View"><i className="fas fa-expand"></i></button>
+                                                                                    <button onClick={() => deleteItem(n.id, 'notices')} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors" title="Delete"><i className="fas fa-trash"></i></button>
+                                                                                </td>
+                                                                            </tr>
+                                                                        );
+                                                                    })}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* COURSE OUTLINES ADMIN TAB */}
+                            {adminTab === 'outlines' && (
+                                <div className="p-6 overflow-y-auto">
+                                    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                            {/* Left Panel: Upload Outline Form */}
+                                            <div className="lg:col-span-1 bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 flex flex-col gap-5">
+                                                <div>
+                                                    <h3 className="font-extrabold text-slate-800 text-lg flex items-center gap-2"><i className="fas fa-file-pdf text-red-500"></i> Upload Course Outline</h3>
+                                                    <p className="text-xs text-slate-400 mt-1">Publish a dynamic PDF syllabus mapping for any course.</p>
+                                                </div>
+                                                
+                                                <form onSubmit={handleOutlineSubmit} className="space-y-4">
+                                                    <div>
+                                                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Select Course *</label>
+                                                        <select 
+                                                            required
+                                                            value={outlineForm.courseCode}
+                                                            onChange={e => setOutlineForm(prev => ({ ...prev, courseCode: e.target.value }))}
+                                                            className="w-full px-4 py-2.5 border border-slate-200 bg-slate-50/50 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all text-sm shadow-sm"
+                                                        >
+                                                            <option value="">-- Choose Course --</option>
+                                                            {COURSE_DB.sort((a,b) => a.code.localeCompare(b.code)).map(c => (
+                                                                <option key={c.code} value={c.code}>{c.code} - {c.name}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Upload Outline PDF *</label>
+                                                        <div className="relative border-2 border-dashed border-slate-200 hover:border-indigo-500/50 rounded-xl p-6 text-center cursor-pointer transition-all bg-slate-50/30 group">
+                                                            <input 
+                                                                type="file" 
+                                                                accept="application/pdf"
+                                                                onChange={handleOutlineFileChange}
+                                                                className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                                                            />
+                                                            <div className="flex flex-col items-center justify-center gap-1">
+                                                                <i className="fas fa-file-pdf text-slate-400 group-hover:text-red-500 text-2xl transition-colors"></i>
+                                                                <span className="text-xs text-slate-600 font-medium">Click to select PDF document</span>
+                                                                <span className="text-[10px] text-slate-400">PDF documents only</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-center gap-3">
+                                                        <span className="h-px bg-slate-200 flex-grow"></span> OR <span className="h-px bg-slate-200 flex-grow"></span>
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">PDF Document URL</label>
+                                                        <input 
+                                                            type="url" 
+                                                            placeholder="e.g. https://catbox.moe/outline.pdf" 
+                                                            value={outlineForm.outlineUrl}
+                                                            onChange={e => setOutlineForm(prev => ({ ...prev, outlineUrl: e.target.value }))}
+                                                            className="w-full px-4 py-2.5 border border-slate-200 bg-slate-50/50 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all text-sm shadow-sm font-mono text-xs"
+                                                        />
+                                                    </div>
+
+                                                    {outlineForm.outlineUrl && (
+                                                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3 animate-in fade-in">
+                                                            <div className="w-10 h-10 rounded bg-red-50 border border-red-200 flex-shrink-0 flex items-center justify-center text-red-500">
+                                                                <i className="fas fa-file-pdf text-lg"></i>
+                                                            </div>
+                                                            <div className="overflow-hidden">
+                                                                <p className="text-[10px] text-green-600 font-extrabold uppercase tracking-wide flex items-center gap-1"><i className="fas fa-check-circle"></i> Document Loaded</p>
+                                                                <p className="text-[9px] text-slate-400 truncate max-w-xs">{outlineForm.file ? outlineForm.file.name : outlineForm.outlineUrl}</p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    <button 
+                                                        type="submit" 
+                                                        className="w-full py-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold rounded-xl transition-all shadow-md shadow-red-600/10 hover:shadow-lg hover:shadow-red-600/20 active:scale-95 transform flex items-center justify-center gap-2 mt-2"
+                                                    >
+                                                        <i className="fas fa-cloud-upload-alt animate-bounce"></i> Publish Outline
+                                                    </button>
+                                                </form>
+                                            </div>
+
+                                            {/* Right Panel: All Outlines List */}
+                                            <div className="lg:col-span-2 space-y-6">
+                                                <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm">
+                                                    <h3 className="font-extrabold text-slate-800 text-lg flex items-center gap-2"><i className="fas fa-list text-indigo-500"></i> Course Outlines Inventory ({courseOutlines.length})</h3>
+                                                    <p className="text-xs text-slate-400 mt-1">Review active syllabus files or perform modifications.</p>
+                                                </div>
+
+                                                {courseOutlines.length === 0 ? (
+                                                    <div className="text-center py-16 bg-white border border-slate-200 rounded-2xl shadow-inner text-slate-400 text-sm">No course outlines currently uploaded. Choose a course on the left to add one!</div>
+                                                ) : (
+                                                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                                                        <div className="overflow-x-auto">
+                                                            <table className="w-full text-sm text-left">
+                                                                <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500 tracking-wider border-b border-slate-100">
+                                                                    <tr>
+                                                                        <th className="px-6 py-4">Course</th>
+                                                                        <th className="px-6 py-4">Syllabus File</th>
+                                                                        <th className="px-6 py-4">Created</th>
+                                                                        <th className="px-6 py-4 text-right">Action</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-slate-100">
+                                                                    {courseOutlines.map(o => (
+                                                                        <tr key={o.id} className="hover:bg-slate-50/50 transition-colors">
+                                                                            <td className="px-6 py-4 font-semibold text-slate-800 text-xs">
+                                                                                <span className="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-bold mr-2 text-[10px]">{o.course_code}</span>
+                                                                                <span>{o.course_name}</span>
+                                                                            </td>
+                                                                            <td className="px-6 py-4 text-xs text-slate-500">
+                                                                                <button 
+                                                                                    onClick={() => { setPreviewUrl(o.outline_url); setShowPreviewModal(true); }}
+                                                                                    className="inline-flex items-center gap-1.5 text-red-500 hover:text-red-700 font-bold"
+                                                                                >
+                                                                                    <i className="fas fa-file-pdf"></i>
+                                                                                    <span>Preview PDF</span>
+                                                                                </button>
+                                                                            </td>
+                                                                            <td className="px-6 py-4 text-slate-500 text-xs">{new Date(o.created_at).toLocaleDateString()}</td>
+                                                                            <td className="px-6 py-4 text-right">
+                                                                                <button onClick={() => deleteItem(o.id, 'course_outlines')} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors" title="Delete"><i className="fas fa-trash"></i></button>
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
@@ -1553,55 +2527,57 @@ export default function QVaultApp() {
                                         t.contact === d.contact
                                     ))
                                 ).map(donor => (
-                                    <div key={donor.id} className="group bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-xl hover:border-red-100 transition-all overflow-hidden flex flex-col relative">
-                                        {/* HEADER: Blood Group & Badge */}
+                                    <div key={donor.id} className="group bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-xl hover:border-red-100 transition-all duration-300 overflow-hidden flex flex-col relative hover:translate-y-[-6px]">
                                         <div className="flex justify-between items-start p-5 pb-0">
-                                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-50 to-red-100 text-red-600 flex items-center justify-center text-xl font-bold border border-red-100 shadow-sm shrink-0">
+                                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 text-white flex items-center justify-center text-xl font-black border border-red-500/20 shadow-md shadow-red-500/10 shrink-0">
                                                 {donor.blood_group}
                                             </div>
-                                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm ${donor.is_donor ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-50 text-slate-500 border border-slate-100'}`}>
-                                                {donor.is_donor ? 'Verified Donor' : 'New Donor'}
+                                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-wider shadow-sm border ${donor.is_donor ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>
+                                                {donor.is_donor ? (
+                                                    <>
+                                                        <i className="fas fa-check-circle text-xs"></i> Verified Donor
+                                                    </>
+                                                ) : (
+                                                    'New Donor'
+                                                )}
                                             </span>
                                         </div>
 
-                                        {/* BODY: Name & Details */}
                                         <div className="p-5 pt-4">
-                                            <h3 className="font-bold text-slate-800 text-xl leading-tight mb-1 font-sans">{donor.name}</h3>
-                                            <div className="text-xs text-slate-500 font-medium uppercase tracking-wide flex flex-col gap-0.5">
-                                                <span>{donor.department}</span>
-                                                <span className="text-slate-400">Batch {donor.batch}</span>
+                                            <h3 className="font-extrabold text-slate-950 text-lg leading-tight mb-2 tracking-tight group-hover:text-red-600 transition-colors font-sans">{donor.name}</h3>
+                                            <div className="text-xs text-slate-500 font-semibold uppercase tracking-wider flex flex-col gap-1">
+                                                <span className="truncate" title={donor.department}>{donor.department}</span>
+                                                <span className="text-slate-400 text-[10px]">Batch: {donor.batch}</span>
                                             </div>
                                             
-                                            {/* Attributes Row */}
-                                            <div className="flex items-center gap-3 mt-4 text-xs font-semibold text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100/50">
+                                            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mt-4 text-xs font-semibold text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100/50">
                                                 <div className="flex items-center gap-1.5">
-                                                    <i className={`fas fa-${donor.gender === 'Female' ? 'venus text-pink-500' : 'mars text-blue-500'}`}></i> 
-                                                    {donor.gender}
+                                                    <i className={`fas fa-${donor.gender === 'Female' ? 'venus text-pink-500' : 'mars text-blue-500'} text-xs`}></i> 
+                                                    <span>{donor.gender}</span>
                                                 </div>
                                                 <span className="text-slate-200">|</span>
-                                                <div className="flex items-center gap-1">
-                                                    <span className="text-slate-400 font-medium">Willingness:</span>
-                                                    <div className="flex text-amber-400 text-[10px]">
-                                                        {[...Array(5)].map((_,i) => <i key={i} className={`fas fa-star ${i < donor.willingness ? '' : 'text-slate-200'}`}></i>)}
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-slate-400 font-bold text-[10px]">Willingness:</span>
+                                                    <div className="flex text-amber-400 text-[9px] gap-0.5">
+                                                        {[...Array(5)].map((_,i) => <i key={i} className={`fas fa-star ${i < donor.willingness ? 'text-amber-400' : 'text-slate-200'}`}></i>)}
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        {/* FOOTER: Contact */}
                                         <div className="mt-auto p-4 border-t border-slate-50 bg-slate-50/50">
                                             {donor.contact ? (
                                                 <div className="flex flex-col gap-3">
-                                                    <div className="text-center">
-                                                        <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-1">Contact Number</p>
-                                                        <p className="font-mono text-lg font-bold text-slate-700 tracking-wide select-all">{donor.contact}</p>
+                                                    <div className="text-center bg-white border border-slate-100/60 p-2 rounded-xl shadow-inner shadow-slate-50">
+                                                        <p className="text-[9px] text-slate-400 uppercase font-extrabold tracking-widest mb-0.5">Contact Number</p>
+                                                        <p className="font-mono text-base font-extrabold text-slate-700 tracking-wider select-all">{donor.contact}</p>
                                                     </div>
-                                                    <a href={`tel:${donor.contact}`} className="flex items-center justify-center gap-2 w-full bg-slate-900 border border-slate-900 hover:bg-red-600 hover:border-red-600 text-white font-bold py-3 rounded-xl transition-all shadow-md active:scale-95">
-                                                        <i className="fas fa-phone-alt animate-pulse"></i> Call Now
+                                                    <a href={`tel:${donor.contact}`} className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-slate-900 to-slate-950 hover:from-black hover:to-black text-white font-bold py-2.5 rounded-xl transition-all shadow-md shadow-slate-950/10 hover:shadow-lg hover:shadow-black/20 active:scale-95 transform group-hover:scale-[1.01]">
+                                                        <i className="fas fa-phone-alt animate-pulse"></i> Call Student Donor
                                                     </a>
                                                 </div>
                                             ) : (
-                                                <span className="block text-center text-slate-400 text-sm italic py-2">No Contact Info</span>
+                                                <span className="block text-center text-slate-400 text-xs italic py-2">No Contact Info Provided</span>
                                             )}
                                         </div>
                                     </div>
@@ -1674,8 +2650,8 @@ export default function QVaultApp() {
                                         <>
                                             <div className="space-y-5">
                                                 <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Thesis Title *</label><input value={uploadFormData.thesisTitle || ''} onChange={e => handleUploadChange('thesisTitle', e.target.value)} placeholder="Enter thesis title" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none" /></div>
-                                                <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Author Name *</label><input value={uploadFormData.author || ''} onChange={e => handleUploadChange('author', e.target.value)} placeholder="Student full name" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none" /></div>
-                                                <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Student ID *</label><input value={uploadFormData.studentId || ''} onChange={e => handleUploadChange('studentId', e.target.value)} placeholder="e.g. CSE12345678" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none" /></div>
+                                                <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Author Name(s) *</label><input value={uploadFormData.author || ''} onChange={e => handleUploadChange('author', e.target.value)} placeholder="e.g. John Doe, Jane Smith (comma-separated for groups)" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none" /></div>
+                                                <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Student ID(s) *</label><input value={uploadFormData.studentId || ''} onChange={e => handleUploadChange('studentId', e.target.value)} placeholder="e.g. CSE12345678, CSE12345679 (comma-separated)" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none" /></div>
                                                 <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Department *</label><div className="relative"><select value={uploadFormData.dept} onChange={e => handleUploadChange('dept', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none appearance-none">{DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}</select><i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div></div>
                                             </div>
                                             <div className="space-y-5">
@@ -1698,26 +2674,40 @@ export default function QVaultApp() {
                                                         {showSupervisorDropdown && (
                                                             <div className="absolute z-30 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-auto">
                                                                 <div 
-                                                                    className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm"
+                                                                    className="px-4 py-2.5 hover:bg-slate-50 cursor-pointer text-sm flex items-center gap-3 transition-colors border-b border-slate-50"
                                                                     onClick={() => {
                                                                         handleUploadChange('supervisorId', 'Additional');
                                                                         setSupervisorSearch('Additional');
                                                                         setShowSupervisorDropdown(false);
                                                                     }}
                                                                 >
-                                                                    Additional
+                                                                    <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
+                                                                        <i className="fas fa-plus text-xs"></i>
+                                                                    </div>
+                                                                    <div className="flex flex-col">
+                                                                        <span className="font-semibold text-slate-800">Additional</span>
+                                                                        <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Guest Faculty</span>
+                                                                    </div>
                                                                 </div>
                                                                 {teachers.filter(t => t.name.toLowerCase().includes(supervisorSearch.toLowerCase())).map(t => (
                                                                     <div 
                                                                         key={t.id} 
-                                                                        className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm"
+                                                                        className="px-4 py-2.5 hover:bg-slate-50 cursor-pointer text-sm flex items-center gap-3 transition-colors border-b border-slate-50 last:border-0"
                                                                         onClick={() => {
                                                                             handleUploadChange('supervisorId', t.id);
                                                                             setSupervisorSearch(t.name);
                                                                             setShowSupervisorDropdown(false);
                                                                         }}
                                                                     >
-                                                                        {t.name}
+                                                                        <img 
+                                                                            src={t.img || 'https://via.placeholder.com/40'} 
+                                                                            alt={t.name} 
+                                                                            className="w-7 h-7 rounded-full object-cover border border-slate-200 shadow-sm"
+                                                                        />
+                                                                        <div className="flex flex-col">
+                                                                            <span className="font-semibold text-slate-800">{t.name}</span>
+                                                                            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{t.dept}</span>
+                                                                        </div>
                                                                     </div>
                                                                 ))}
                                                             </div>
@@ -1725,7 +2715,7 @@ export default function QVaultApp() {
                                                         <i className="fas fa-search absolute right-4 top-4 text-slate-400 text-xs pointer-events-none z-20"></i>
                                                     </div>
                                                 </div>
-                                                <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Abstract / Description</label><textarea value={uploadFormData.abstract || ''} onChange={e => handleUploadChange('abstract', e.target.value)} placeholder="Brief description of the thesis..." rows="4" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none resize-none" /></div>
+                                                <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Abstract / Description</label><textarea value={uploadFormData.abstract || ''} onChange={e => handleUploadChange('abstract', e.target.value)} placeholder="Paste the official academic thesis abstract or project executive summary here..." rows="4" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none resize-none" /></div>
                                                 
                                                 <div className="flex gap-4">
                                                     <div className="w-1/2">
@@ -1752,8 +2742,19 @@ export default function QVaultApp() {
                                                 </div>
 
                                                 <div>
-                                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Project Link (Optional)</label>
-                                                    <input value={uploadFormData.projectLink || ''} onChange={e => handleUploadChange('projectLink', e.target.value)} placeholder="https://github.com/username/repo" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none" />
+                                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Research Keywords (Optional)</label>
+                                                    <input value={uploadFormData.keywords || ''} onChange={e => handleUploadChange('keywords', e.target.value)} placeholder="e.g. Deep Learning, NLP, IoT, Web Security (comma-separated)" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none" />
+                                                </div>
+
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Project Code or Live Demo Link (Optional)</label>
+                                                        <input value={uploadFormData.projectLink || ''} onChange={e => handleUploadChange('projectLink', e.target.value)} placeholder="e.g. https://github.com/... or Vercel URL" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Defense Presentation Slides (Optional)</label>
+                                                        <input value={uploadFormData.slidesLink || ''} onChange={e => handleUploadChange('slidesLink', e.target.value)} placeholder="e.g. Google Slides, PowerPoint Drive Link" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none" />
+                                                    </div>
                                                 </div>
                                             </div>
                                         </>
@@ -1779,7 +2780,7 @@ export default function QVaultApp() {
                                                 ) : (
                                                     <div>
                                                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Material Type</label>
-                                                        <div className="relative"><select value={uploadFormData.matType} onChange={e => handleUploadChange('matType', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option value="slide">Slide/Presentation</option><option value="book">Book/PDF</option><option value="note">Class Note</option></select><i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
+                                                        <div className="relative"><select value={uploadFormData.matType} onChange={e => handleUploadChange('matType', e.target.value)} className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none"><option value="slide">Slide/Presentation</option><option value="book">Book/PDF</option><option value="note">Class Note</option><option value="course_link">Course Materials Link</option></select><i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i></div>
                                                     </div>
                                                 )}
                                             </div>
@@ -1822,26 +2823,40 @@ export default function QVaultApp() {
                                                             {showTeacherDropdown && (
                                                                 <div className="absolute z-30 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-auto">
                                                                     <div 
-                                                                        className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm"
+                                                                        className="px-4 py-2.5 hover:bg-slate-50 cursor-pointer text-sm flex items-center gap-3 transition-colors border-b border-slate-50"
                                                                         onClick={() => {
                                                                             handleUploadChange('teacherId', 'Additional');
                                                                             setTeacherSearch('Additional');
                                                                             setShowTeacherDropdown(false);
                                                                         }}
                                                                     >
-                                                                        Additional
+                                                                        <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
+                                                                            <i className="fas fa-plus text-xs"></i>
+                                                                        </div>
+                                                                        <div className="flex flex-col">
+                                                                            <span className="font-semibold text-slate-800">Additional</span>
+                                                                            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Guest Faculty</span>
+                                                                        </div>
                                                                     </div>
                                                                     {teachers.filter(t => t.name.toLowerCase().includes(teacherSearch.toLowerCase())).map(t => (
                                                                         <div 
                                                                             key={t.id} 
-                                                                            className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm"
+                                                                            className="px-4 py-2.5 hover:bg-slate-50 cursor-pointer text-sm flex items-center gap-3 transition-colors border-b border-slate-50 last:border-0"
                                                                             onClick={() => {
                                                                                 handleUploadChange('teacherId', t.id);
                                                                                 setTeacherSearch(t.name);
                                                                                 setShowTeacherDropdown(false);
                                                                             }}
                                                                         >
-                                                                            {t.name}
+                                                                            <img 
+                                                                                src={t.img || 'https://via.placeholder.com/40'} 
+                                                                                alt={t.name} 
+                                                                                className="w-7 h-7 rounded-full object-cover border border-slate-200 shadow-sm"
+                                                                            />
+                                                                            <div className="flex flex-col">
+                                                                                <span className="font-semibold text-slate-800">{t.name}</span>
+                                                                                <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{t.dept}</span>
+                                                                            </div>
                                                                         </div>
                                                                     ))}
                                                                 </div>
@@ -1852,6 +2867,51 @@ export default function QVaultApp() {
                                                 </div>
                                             </div>
                                         </>
+                                    )}
+                                    {uploadType === 'material' && (
+                                        <div className="space-y-4 bg-slate-50 border border-slate-200/85 p-5 rounded-2xl col-span-1 sm:col-span-2">
+                                            <h4 className="text-xs font-bold text-slate-800 flex items-center gap-2 tracking-wide uppercase">
+                                                <i className="fas fa-link text-indigo-500 text-sm"></i> Direct Link Inputs
+                                            </h4>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center justify-between">
+                                                        <span>Course Materials Link</span>
+                                                        {uploadFormData.matType === 'course_link' && <span className="text-[10px] text-red-500 font-bold tracking-normal lowercase">(Required for Course Link)</span>}
+                                                    </label>
+                                                    <input 
+                                                        value={uploadFormData.courseMaterialsLink || ''} 
+                                                        onChange={e => handleUploadChange('courseMaterialsLink', e.target.value)} 
+                                                        placeholder="e.g. Drive, OneDrive, Dropbox link" 
+                                                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none text-sm shadow-sm" 
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex justify-between items-center">
+                                                        <span>PDF Upload Link (PDF &gt; 4.5MB)</span>
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={() => setShowCatboxTutorial(true)} 
+                                                            className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                                        >
+                                                            <i className="fas fa-play-circle text-xs"></i> Tutorial
+                                                        </button>
+                                                    </label>
+                                                    <div className="relative">
+                                                        <input 
+                                                            value={uploadFormData.pdfUploadLink || ''} 
+                                                            onChange={e => handleUploadChange('pdfUploadLink', e.target.value)} 
+                                                            placeholder="e.g. paste Catbox / Drive link here" 
+                                                            className="w-full pl-4 pr-10 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none text-sm shadow-sm" 
+                                                        />
+                                                        <i className="fas fa-info-circle text-slate-400 absolute right-4 top-4 text-xs" title="If PDF > 4.5MB, upload manually and paste link"></i>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 italic">
+                                                * Note: If you provide either link, file/image upload below becomes completely optional. Links save Supabase database storage!
+                                            </div>
+                                        </div>
                                     )}
                                     <div className="sm:col-span-2 mt-2">
                                         <div className="border-2 border-dashed border-slate-300 rounded-2xl px-6 py-10 text-center hover:bg-indigo-50 hover:border-indigo-300 transition-all bg-slate-50 cursor-pointer relative group">
@@ -1871,7 +2931,9 @@ export default function QVaultApp() {
                                                     ? uploadFile.name 
                                                     : selectedImages.length > 0 
                                                     ? `${selectedImages.length} image${selectedImages.length > 1 ? 's' : ''} selected` 
-                                                    : 'Upload PDF or capture/select images'
+                                                    : (uploadType === 'material' && (uploadFormData.matType === 'course_link' || uploadFormData.courseMaterialsLink || uploadFormData.pdfUploadLink))
+                                                    ? 'Upload PDF or select images (Optional - Link provided)'
+                                                    : 'Upload PDF or capture/select images *'
                                                 }
                                             </p>
                                             
@@ -1966,6 +3028,97 @@ export default function QVaultApp() {
                 </div>
             )}
 
+            {/* CATBOX TUTORIAL MODAL */}
+            {showCatboxTutorial && (
+                <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
+                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowCatboxTutorial(false)}></div>
+                    <div className="relative bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all max-w-lg w-full z-10 border border-slate-100 flex flex-col max-h-[90vh]">
+                        {/* Header */}
+                        <div className="bg-slate-900 text-white p-6 flex justify-between items-center">
+                            <div>
+                                <h3 className="text-lg font-bold flex items-center gap-2">
+                                    <i className="fas fa-file-invoice text-indigo-400"></i> Manual Large PDF Guide
+                                </h3>
+                                <p className="text-xs text-slate-400 mt-0.5">Step-by-step upload process for PDFs &gt; 4.5 MB</p>
+                            </div>
+                            <button onClick={() => setShowCatboxTutorial(false)} className="text-slate-400 hover:text-white hover:bg-white/10 rounded-full p-2 transition-colors">
+                                <i className="fas fa-times text-lg"></i>
+                            </button>
+                        </div>
+                        
+                        {/* Content */}
+                        <div className="p-6 overflow-y-auto space-y-4">
+                            <div className="p-3.5 bg-indigo-50 border border-indigo-100 rounded-xl text-xs text-indigo-700 leading-relaxed flex gap-3">
+                                <i className="fas fa-exclamation-triangle text-indigo-500 text-base mt-0.5 flex-shrink-0"></i>
+                                <span>
+                                    To maintain high speed and keep Supabase size efficient, files exceeding <strong>4.5 MB</strong> cannot be uploaded directly. Please use this guide to upload manually.
+                                </span>
+                            </div>
+
+                            <div className="space-y-4 pt-1">
+                                <div className="flex gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</div>
+                                    <div>
+                                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Open Catbox File Upload</h4>
+                                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                                            Visit <a href="https://catbox.moe" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-800 font-bold underline inline-flex items-center gap-1">catbox.moe <i className="fas fa-external-link-alt text-[10px]"></i></a> in a new tab. It is a completely free, anonymous file host.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</div>
+                                    <div>
+                                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Upload Your PDF</h4>
+                                        <p className="text-xs text-slate-500 mt-1 leading-relaxed font-sans">
+                                            Drag and drop your large PDF onto the site, or click "Select or drop files here" to upload your file.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</div>
+                                    <div>
+                                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Copy Generated Link</h4>
+                                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                                            Wait for the upload to complete. Once done, a link like <code className="bg-slate-100 px-1.5 py-0.5 rounded text-indigo-600 font-mono text-[11px] font-bold">https://files.catbox.moe/xxxxxx.pdf</code> will appear. Copy it.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</div>
+                                    <div>
+                                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Paste the Link in QVault</h4>
+                                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                                            Return here and paste that link directly into the <strong>PDF Upload Link</strong> field. You're done!
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+                            <a 
+                                href="https://catbox.moe" 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="bg-white border border-slate-200 hover:border-slate-300 text-slate-700 text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all flex items-center gap-1.5"
+                            >
+                                <i className="fas fa-rocket text-indigo-500"></i> Open Catbox
+                            </a>
+                            <button 
+                                onClick={() => setShowCatboxTutorial(false)} 
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-md transition-all"
+                            >
+                                Got It
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* PREVIEW MODAL */}
             {showPreviewModal && (
                 <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -1983,6 +3136,38 @@ export default function QVaultApp() {
                             <div className="bg-slate-50 px-4 py-4 sm:px-6 sm:flex sm:flex-row-reverse border-t border-slate-100 gap-3">
                                 <button onClick={() => window.open(previewUrl, '_blank')} className="w-full inline-flex justify-center rounded-xl border border-transparent shadow-lg shadow-indigo-500/20 px-6 py-2.5 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 sm:w-auto sm:text-sm transition-all">Download PDF</button>
                                 <button onClick={() => setShowPreviewModal(false)} className="mt-3 w-full inline-flex justify-center rounded-xl border border-slate-300 shadow-sm px-6 py-2.5 bg-white text-base font-medium text-slate-700 hover:bg-slate-50 sm:mt-0 sm:w-auto sm:text-sm transition-all">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* NOTICE LIGHTBOX MODAL */}
+            {showNoticeLightbox && lightboxNotice && (
+                <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md transition-opacity" onClick={() => setShowNoticeLightbox(false)}></div>
+                        <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+                        <div className="inline-block align-bottom bg-slate-900 border border-slate-800 rounded-3xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+                            <div className="bg-slate-900 px-4 pt-5 pb-4 sm:p-6 sm:pb-4 relative">
+                                <button onClick={() => setShowNoticeLightbox(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white bg-white/10 hover:bg-white/20 rounded-full w-9 h-9 flex items-center justify-center transition-colors z-30"><i className="fas fa-times"></i></button>
+                                <div className="mb-4 pr-10">
+                                    <h3 className="text-xl font-bold text-white tracking-tight">{lightboxNotice.title || 'Announcement'}</h3>
+                                    <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
+                                        <i className="fas fa-calendar-alt"></i> Posted on: {new Date(lightboxNotice.created_at).toLocaleDateString(undefined, {month: 'long', day: 'numeric', year: 'numeric'})}
+                                        <span className="text-slate-600">•</span>
+                                        <span className="text-red-400 font-semibold flex items-center gap-1">
+                                            <i className="fas fa-clock"></i> Expires: {new Date(lightboxNotice.expires_at).toLocaleDateString(undefined, {month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'})}
+                                        </span>
+                                    </p>
+                                </div>
+                                <div className="bg-slate-950 rounded-2xl h-[65vh] flex items-center justify-center relative overflow-hidden border border-slate-800">
+                                    <img src={lightboxNotice.image_url} alt={lightboxNotice.title} className="w-full h-full object-contain max-h-full" />
+                                </div>
+                            </div>
+                            <div className="bg-slate-950 px-4 py-4 sm:px-6 sm:flex sm:flex-row-reverse border-t border-slate-850 gap-3">
+                                <a href={lightboxNotice.image_url} download={`Notice_${lightboxNotice.title.replace(/\s+/g, '_')}`} target="_blank" rel="noopener noreferrer" className="w-full inline-flex justify-center rounded-xl border border-transparent shadow-lg shadow-indigo-500/20 px-6 py-2.5 bg-indigo-600 text-base font-bold text-white hover:bg-indigo-700 sm:w-auto sm:text-sm transition-all flex items-center gap-2"><i className="fas fa-download"></i> Open in New Tab / Download</a>
+                                <button onClick={() => setShowNoticeLightbox(false)} className="mt-3 w-full inline-flex justify-center rounded-xl border border-slate-800 shadow-sm px-6 py-2.5 bg-slate-900 text-base font-bold text-slate-300 hover:bg-slate-800 hover:text-white sm:mt-0 sm:w-auto sm:text-sm transition-all">Close</button>
                             </div>
                         </div>
                     </div>
@@ -2150,7 +3335,7 @@ export default function QVaultApp() {
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Category</label>
-                                <select value={filters.materials.type} onChange={e => setFilters(prev => ({ ...prev, materials: { ...prev.materials, type: e.target.value } }))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"><option value="">All Types</option><option value="book">Books</option><option value="slide">Slides</option><option value="note">Notes</option></select>
+                                <select value={filters.materials.type} onChange={e => setFilters(prev => ({ ...prev, materials: { ...prev.materials, type: e.target.value } }))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"><option value="">All Types</option><option value="book">Books</option><option value="slide">Slides</option><option value="note">Notes</option><option value="course_link">Course Links</option></select>
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Faculty</label>
