@@ -100,15 +100,19 @@ export default function QVaultApp() {
     const [showNoticeLightbox, setShowNoticeLightbox] = useState(false);
     const [lightboxNotice, setLightboxNotice] = useState(null);
     const [noticeSearchQuery, setNoticeSearchQuery] = useState('');
+    const [isSubmittingNotice, setIsSubmittingNotice] = useState(false);
     const [noticeForm, setNoticeForm] = useState({
         title: '',
         imageUrl: '',
         expiresAt: '',
+        targetBatch: '',
         file: null
     });
 
     // Course Outlines State Hooks
     const [courseOutlines, setCourseOutlines] = useState([]);
+    const [outlineSearchQuery, setOutlineSearchQuery] = useState('');
+    const [onlyWithOutlines, setOnlyWithOutlines] = useState(false);
     const [outlineForm, setOutlineForm] = useState({
         courseCode: '',
         courseName: '',
@@ -917,20 +921,28 @@ export default function QVaultApp() {
             return;
         }
 
-        const noticeData = {
-            title: noticeForm.title,
-            image_url: noticeForm.imageUrl,
-            expires_at: new Date(noticeForm.expiresAt).toISOString(),
-            created_at: new Date().toISOString()
-        };
+        setIsSubmittingNotice(true);
+        try {
+            const noticeData = {
+                title: noticeForm.title,
+                image_url: noticeForm.imageUrl,
+                expires_at: new Date(noticeForm.expiresAt).toISOString(),
+                target_batch: noticeForm.targetBatch || 'All Students',
+                created_at: new Date().toISOString()
+            };
 
-        const { error } = await supabase.from('notices').insert(noticeData);
-        if (error) {
+            const { error } = await supabase.from('notices').insert(noticeData);
+            if (error) {
+                throw error;
+            }
+            
+            setNoticeForm({ title: '', imageUrl: '', expiresAt: '', targetBatch: '', file: null });
+            showToast('Published', 'Notice uploaded successfully', 'success');
+        } catch (error) {
             console.error('Error adding notice:', error);
             showToast('Error', 'Publish notice failed: ' + error.message, 'error');
-        } else {
-            setNoticeForm({ title: '', imageUrl: '', expiresAt: '', file: null });
-            showToast('Published', 'Notice uploaded successfully', 'success');
+        } finally {
+            setIsSubmittingNotice(false);
         }
     };
 
@@ -1007,6 +1019,7 @@ export default function QVaultApp() {
             showToast('Error', 'Outline upload failed: ' + error.message, 'error');
         } else {
             setOutlineForm({ courseCode: '', courseName: '', outlineUrl: '', file: null });
+            setShowUploadModal(false);
             showToast('Published', 'Course outline published successfully', 'success');
         }
     };
@@ -1159,7 +1172,14 @@ export default function QVaultApp() {
                                                         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-4 md:p-6 text-white flex flex-col justify-end">
                                                             <div className="flex items-center justify-between gap-4">
                                                                 <div>
-                                                                    <h3 className="font-bold text-sm md:text-lg tracking-tight drop-shadow">{n.title || 'Untitled Announcement'}</h3>
+                                                                    <h3 className="font-bold text-sm md:text-lg tracking-tight drop-shadow flex items-center gap-2 flex-wrap">
+                                                                        <span>{n.title || 'Untitled Announcement'}</span>
+                                                                        {n.target_batch && n.target_batch !== 'All Students' ? (
+                                                                            <span className="bg-indigo-600/90 text-white text-[9px] font-bold px-2 py-0.5 rounded-full border border-indigo-500 shadow align-middle uppercase tracking-wide">Batch {n.target_batch}</span>
+                                                                        ) : (
+                                                                            <span className="bg-emerald-600/90 text-white text-[9px] font-bold px-2 py-0.5 rounded-full border border-emerald-500 shadow align-middle uppercase tracking-wide">All Students</span>
+                                                                        )}
+                                                                    </h3>
                                                                     <p className="text-[10px] md:text-xs text-slate-300 flex items-center gap-1.5 mt-1">
                                                                         <i className="fas fa-calendar-alt"></i> Posted: {new Date(n.created_at).toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'})}
                                                                         <span className="text-slate-500">•</span>
@@ -1262,7 +1282,14 @@ export default function QVaultApp() {
                                                             </div>
                                                             <div className="p-4 flex flex-col flex-grow justify-between gap-4">
                                                                 <div>
-                                                                    <h4 className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors line-clamp-2">{n.title}</h4>
+                                                                    <h4 className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors line-clamp-2 flex items-center gap-1.5 flex-wrap">
+                                                                        <span>{n.title}</span>
+                                                                        {n.target_batch && n.target_batch !== 'All Students' ? (
+                                                                            <span className="inline-block bg-indigo-50 text-indigo-700 text-[8px] font-extrabold px-1.5 py-0.5 rounded border border-indigo-100 uppercase tracking-wide">Batch {n.target_batch}</span>
+                                                                        ) : (
+                                                                            <span className="inline-block bg-emerald-50 text-emerald-700 text-[8px] font-extrabold px-1.5 py-0.5 rounded border border-emerald-100 uppercase tracking-wide">All Students</span>
+                                                                        )}
+                                                                    </h4>
                                                                     <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1"><i className="fas fa-calendar-alt"></i> Posted: {new Date(n.created_at).toLocaleDateString()}</p>
                                                                 </div>
                                                                 <div className="flex gap-2">
@@ -1553,59 +1580,120 @@ export default function QVaultApp() {
                 {/* COURSE OUTLINES VIEW */}
                 {view === 'course-outline' && (
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-                        <div className="relative text-center mb-16">
+                        <div className="relative text-center mb-12">
                             <div className="text-center">
                                 <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">Course Outlines</h2>
                                 <p className="mt-4 max-w-2xl mx-auto text-lg text-slate-500 font-medium">Browse dynamic PDF syllabus outlines by department.</p>
                             </div>
-                            <div className="mt-8 max-w-md mx-auto">
-                                <select value={courseListDept} onChange={(e) => setCourseListDept(e.target.value)} className="block w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none shadow-sm">
-                                    {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-                                </select>
+                            
+                            {/* Premium Search and Department Filter Panel */}
+                            <div className="mt-10 max-w-2xl mx-auto bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row gap-4">
+                                <div className="relative flex-1">
+                                    <i className="fas fa-search text-slate-400 absolute left-3.5 top-3.5 text-sm"></i>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Search course code or name..." 
+                                        value={outlineSearchQuery}
+                                        onChange={e => setOutlineSearchQuery(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none text-sm shadow-sm transition-all"
+                                    />
+                                </div>
+                                <div className="w-full sm:w-64 relative">
+                                    <select 
+                                        value={courseListDept} 
+                                        onChange={e => setCourseListDept(e.target.value)} 
+                                        className="block w-full px-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none text-sm shadow-sm appearance-none cursor-pointer transition-all"
+                                    >
+                                        {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                                    </select>
+                                    <i className="fas fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i>
+                                </div>
+                            </div>
+
+                            {/* Show only published checkbox toggle */}
+                            <div className="mt-4 flex justify-center">
+                                <label className="inline-flex items-center cursor-pointer text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors select-none">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={onlyWithOutlines}
+                                        onChange={e => setOnlyWithOutlines(e.target.checked)}
+                                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4.5 w-4.5 mr-2 transition-all cursor-pointer"
+                                    />
+                                    <span>Show only courses with published outlines ({courseOutlines.filter(o => {
+                                        const staticCourses = courseListDept === 'Computer Science & Engineering' ? COURSE_DB : [];
+                                        const dynamicCourses = [...new Set(papers.filter(p => p.dept === courseListDept).map(p => JSON.stringify({ code: p.courseCode, name: p.courseName })))].map(s => JSON.parse(s));
+                                        const allCourses = [...staticCourses, ...dynamicCourses].filter((v,i,a)=>a.findIndex(t=>(t.code === v.code))===i);
+                                        return allCourses.some(c => c.code === o.course_code);
+                                    }).length})</span>
+                                </label>
                             </div>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {(() => {
-                                const staticCourses = courseListDept === 'Computer Science & Engineering' ? COURSE_DB : [];
-                                const dynamicCourses = [...new Set(papers.filter(p => p.dept === courseListDept).map(p => JSON.stringify({ code: p.courseCode, name: p.courseName })))].map(s => JSON.parse(s));
-                                const allCourses = [...staticCourses, ...dynamicCourses].filter((v,i,a)=>a.findIndex(t=>(t.code === v.code))===i).sort((a,b) => a.code.localeCompare(b.code));
 
-                                return allCourses.map((c, i) => {
-                                    const outline = courseOutlines.find(o => o.course_code === c.code);
-                                    return (
-                                        <div key={i} onClick={() => { setFilters(prev => ({ ...prev, vault: { ...prev.vault, search: c.code } })); navigate('vault'); }} className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between">
-                                            <div>
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{c.code}</span>
-                                                    <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{c.credits ? `${c.credits} Cr` : 'N/A'}</span>
+                        {(() => {
+                            const staticCourses = courseListDept === 'Computer Science & Engineering' ? COURSE_DB : [];
+                            const dynamicCourses = [...new Set(papers.filter(p => p.dept === courseListDept).map(p => JSON.stringify({ code: p.courseCode, name: p.courseName })))].map(s => JSON.parse(s));
+                            const allCourses = [...staticCourses, ...dynamicCourses]
+                                .filter((v,i,a)=>a.findIndex(t=>(t.code === v.code))===i)
+                                .sort((a,b) => a.code.localeCompare(b.code));
+
+                            const filteredCourses = allCourses.filter(c => {
+                                const matchesSearch = !outlineSearchQuery || 
+                                    c.code.toLowerCase().includes(outlineSearchQuery.toLowerCase()) || 
+                                    c.name.toLowerCase().includes(outlineSearchQuery.toLowerCase());
+                                const outline = courseOutlines.find(o => o.course_code === c.code);
+                                const matchesOutlineOnly = !onlyWithOutlines || !!outline;
+                                return matchesSearch && matchesOutlineOnly;
+                            });
+
+                            return filteredCourses.length === 0 ? (
+                                <div className="text-center py-16 bg-white border border-slate-200/60 rounded-2xl max-w-2xl mx-auto shadow-inner flex flex-col items-center justify-center">
+                                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 mb-4 border border-slate-200/80"><i className="fas fa-file-pdf text-2xl"></i></div>
+                                    <h3 className="font-extrabold text-slate-800 text-lg">No Outlines Match Criteria</h3>
+                                    <p className="text-slate-400 text-sm mt-1 max-w-sm">No courses matching your search or filters found. Try clearing your search text or shifting departments.</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {filteredCourses.map((c, i) => {
+                                        const outline = courseOutlines.find(o => o.course_code === c.code);
+                                        return (
+                                            <div key={i} onClick={() => { setFilters(prev => ({ ...prev, vault: { ...prev.vault, search: c.code } })); navigate('vault'); }} className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between hover:translate-y-[-4px] duration-300">
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{c.code}</span>
+                                                        <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{c.credits ? `${c.credits} Cr` : 'N/A'}</span>
+                                                    </div>
+                                                    <h3 className="font-bold text-slate-800 mb-2 group-hover:text-indigo-600 transition-colors">{c.name}</h3>
+                                                    {c.pre && (
+                                                        <div className="mt-2 pt-2 border-t border-slate-50">
+                                                            <p className="text-xs text-slate-500"><span className="font-bold text-slate-400 uppercase text-[10px]">Pre-req:</span> {c.pre}</p>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <h3 className="font-bold text-slate-800 mb-2">{c.name}</h3>
-                                                {c.pre && (
-                                                    <div className="mt-2 pt-2 border-t border-slate-50">
-                                                        <p className="text-xs text-slate-500"><span className="font-bold text-slate-400 uppercase">Pre-req:</span> {c.pre}</p>
+                                                {outline ? (
+                                                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                                                        <button 
+                                                            onClick={(e) => { 
+                                                                e.stopPropagation(); 
+                                                                setPreviewUrl(outline.outline_url); 
+                                                                setShowPreviewModal(true); 
+                                                            }} 
+                                                            className="inline-flex items-center gap-2 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all w-full justify-center shadow-md active:scale-95 transform"
+                                                        >
+                                                            <i className="fas fa-file-pdf text-sm animate-pulse"></i>
+                                                            <span>View Course Outline</span>
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-center">
+                                                        <span className="text-[10px] text-slate-400 font-bold flex items-center gap-1.5"><i className="fas fa-info-circle"></i> Syllabus pending upload</span>
                                                     </div>
                                                 )}
                                             </div>
-                                            {outline && (
-                                                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                                                    <button 
-                                                        onClick={(e) => { 
-                                                            e.stopPropagation(); 
-                                                            setPreviewUrl(outline.outline_url); 
-                                                            setShowPreviewModal(true); 
-                                                        }} 
-                                                        className="inline-flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 px-3.5 py-2 rounded-xl text-xs font-bold transition-all w-full justify-center shadow-sm active:scale-95 transform"
-                                                    >
-                                                        <i className="fas fa-file-pdf text-sm animate-pulse"></i>
-                                                        <span>Course Outline</span>
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                });
-                            })()}
-                        </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })()}
                     </div>
                 )}
 
@@ -2243,7 +2331,7 @@ export default function QVaultApp() {
                                                         <input 
                                                             type="url" 
                                                             placeholder="e.g. https://catbox.moe/notice.png" 
-                                                            value={noticeForm.imageUrl}
+                                                            value={noticeForm.imageUrl && noticeForm.imageUrl.startsWith('data:') ? '' : noticeForm.imageUrl}
                                                             onChange={e => setNoticeForm(prev => ({ ...prev, imageUrl: e.target.value }))}
                                                             className="w-full px-4 py-2.5 border border-slate-200 bg-slate-50/50 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all text-sm shadow-sm font-mono text-xs"
                                                         />
@@ -2256,10 +2344,21 @@ export default function QVaultApp() {
                                                             </div>
                                                             <div className="overflow-hidden">
                                                                 <p className="text-[10px] text-green-600 font-extrabold uppercase tracking-wide flex items-center gap-1"><i className="fas fa-check-circle"></i> Image Loaded</p>
-                                                                <p className="text-[9px] text-slate-400 truncate max-w-xs">{noticeForm.file ? noticeForm.file.name : noticeForm.imageUrl}</p>
+                                                                <p className="text-[9px] text-slate-400 truncate max-w-xs">{noticeForm.file ? noticeForm.file.name : (noticeForm.imageUrl.startsWith('data:') ? 'Local Image File' : noticeForm.imageUrl)}</p>
                                                             </div>
                                                         </div>
                                                     )}
+
+                                                    <div>
+                                                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Target Batch</label>
+                                                        <input 
+                                                            type="text" 
+                                                            placeholder="e.g. 61 (by default for all students)" 
+                                                            value={noticeForm.targetBatch}
+                                                            onChange={e => setNoticeForm(prev => ({ ...prev, targetBatch: e.target.value }))}
+                                                            className="w-full px-4 py-2.5 border border-slate-200 bg-slate-50/50 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all text-sm shadow-sm"
+                                                        />
+                                                    </div>
 
                                                     <div>
                                                         <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Validation Time (Expires At) *</label>
@@ -2274,9 +2373,14 @@ export default function QVaultApp() {
 
                                                     <button 
                                                         type="submit" 
-                                                        className="w-full py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-bold rounded-xl transition-all shadow-md shadow-indigo-600/10 hover:shadow-lg hover:shadow-indigo-600/20 active:scale-95 transform flex items-center justify-center gap-2 mt-2"
+                                                        disabled={isSubmittingNotice}
+                                                        className="w-full py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-bold rounded-xl transition-all shadow-md shadow-indigo-600/10 hover:shadow-lg hover:shadow-indigo-600/20 active:scale-95 transform flex items-center justify-center gap-2 mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
-                                                        <i className="fas fa-cloud-upload-alt animate-bounce"></i> Publish Notice
+                                                        {isSubmittingNotice ? (
+                                                            <><i className="fas fa-spinner animate-spin"></i> Publishing...</>
+                                                        ) : (
+                                                            <><i className="fas fa-cloud-upload-alt animate-bounce"></i> Publish Notice</>
+                                                        )}
                                                     </button>
                                                 </form>
                                             </div>
@@ -2316,7 +2420,10 @@ export default function QVaultApp() {
                                                                                         <div className="w-8 h-8 rounded bg-slate-900 border border-slate-200 overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => { setLightboxNotice(n); setShowNoticeLightbox(true); }} title="Expand">
                                                                                             <img src={n.image_url} alt={n.title} className="w-full h-full object-cover" />
                                                                                         </div>
-                                                                                        <span className="truncate max-w-[200px]">{n.title}</span>
+                                                                                        <div className="flex flex-col">
+                                                                                            <span className="truncate max-w-[200px] font-bold text-slate-800">{n.title}</span>
+                                                                                            <span className="text-[9px] text-slate-400 font-medium">Target: {n.target_batch || 'All Students'}</span>
+                                                                                        </div>
                                                                                     </div>
                                                                                 </td>
                                                                                 <td className="px-6 py-4 text-slate-500 text-xs">{new Date(n.created_at).toLocaleDateString()}</td>
@@ -2493,9 +2600,15 @@ export default function QVaultApp() {
                                     Blood Bank
                                 </h1>
                                 <p className="text-slate-500 text-lg">Find student donors instantly.</p>
-                                <p className="text-xs text-emerald-600 mt-2 font-medium italic">
-                                    "যে কেউ একজনের জীবন রক্ষা করল, সে যেন সমগ্র মানবজাতির জীবন রক্ষা করল।" (সূরা আল-মায়িদাহ, ৫:৩২)
-                                </p>
+                                <div className="mt-4 p-4 bg-emerald-50/80 border-l-4 border-emerald-500 rounded-r-2xl max-w-2xl shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <p className="text-sm text-emerald-800 font-semibold leading-relaxed italic flex items-start gap-2.5">
+                                        <i className="fas fa-quote-left text-emerald-500/80 text-base mt-0.5 shrink-0"></i>
+                                        <span>
+                                            "যে কেউ একজনের জীবন রক্ষা করল, সে যেন সমগ্র মানবজাতির জীবন রক্ষা করল।" 
+                                            <span className="text-[11px] text-emerald-600 block mt-1.5 font-bold not-italic font-sans">— (সূরা আল-মায়িদাহ, ৫:৩২)</span>
+                                        </span>
+                                    </p>
+                                </div>
                                 
                                 <div className="mt-6 flex gap-3">
                                     <button onClick={() => setShowBloodFilter(true)} className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl font-bold hover:bg-slate-50 shadow-sm transition-all">
@@ -2642,14 +2755,97 @@ export default function QVaultApp() {
                             </div>
                             <div className="bg-white -mt-8 mx-4 mb-4 rounded-xl shadow-lg px-8 py-8 relative">
                                 <div className="flex justify-center mb-8">
-                                    <div className="bg-slate-100 p-1.5 rounded-xl inline-flex shadow-inner">
-                                        <button onClick={() => { setUploadType('paper'); setUploadFormData(p => ({ ...p, matType: 'slide' })); updateCourseOptions('theory'); }} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${uploadType === 'paper' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Question Paper</button>
-                                        <button onClick={() => { setUploadType('material'); setUploadFormData(p => ({ ...p, matType: 'book' })); updateCourseOptions('theory'); }} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${uploadType === 'material' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Course Material</button>
-                                        <button onClick={() => { setUploadType('thesis'); }} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${uploadType === 'thesis' ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Thesis Paper</button>
+                                    <div className="bg-slate-100 p-1.5 rounded-xl inline-flex shadow-inner flex-wrap justify-center gap-1">
+                                        <button onClick={() => { setUploadType('paper'); setUploadFormData(p => ({ ...p, matType: 'slide' })); updateCourseOptions('theory'); }} className={`px-4 sm:px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${uploadType === 'paper' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Question Paper</button>
+                                        <button onClick={() => { setUploadType('material'); setUploadFormData(p => ({ ...p, matType: 'book' })); updateCourseOptions('theory'); }} className={`px-4 sm:px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${uploadType === 'material' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Course Material</button>
+                                        <button onClick={() => { setUploadType('thesis'); }} className={`px-4 sm:px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${uploadType === 'thesis' ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Thesis Paper</button>
+                                        <button onClick={() => { setUploadType('outline'); }} className={`px-4 sm:px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${uploadType === 'outline' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-500 hover:text-rose-600'}`}>Course Outline</button>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                    {uploadType === 'thesis' ? (
+                                    {uploadType === 'outline' ? (
+                                        user === 'admin' ? (
+                                            <>
+                                                <div className="col-span-1 sm:col-span-2">
+                                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Select Course *</label>
+                                                    <select 
+                                                        required
+                                                        value={outlineForm.courseCode}
+                                                        onChange={e => setOutlineForm(prev => ({ ...prev, courseCode: e.target.value }))}
+                                                        className="w-full px-4 py-3 border border-slate-200 bg-slate-50/50 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-rose-500/20 transition-all text-sm shadow-sm"
+                                                    >
+                                                        <option value="">-- Choose Course --</option>
+                                                        {COURSE_DB.sort((a,b) => a.code.localeCompare(b.code)).map(c => (
+                                                            <option key={c.code} value={c.code}>{c.code} - {c.name}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+
+                                                <div className="space-y-5 col-span-1 sm:col-span-2">
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Upload Outline PDF *</label>
+                                                        <div className="relative border-2 border-dashed border-slate-200 hover:border-rose-500/50 rounded-xl p-6 text-center cursor-pointer transition-all bg-slate-50/30 group">
+                                                            <input 
+                                                                type="file" 
+                                                                accept="application/pdf"
+                                                                onChange={handleOutlineFileChange}
+                                                                className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                                                            />
+                                                            <div className="flex flex-col items-center justify-center gap-1">
+                                                                <i className="fas fa-file-pdf text-slate-400 group-hover:text-red-500 text-2xl transition-colors"></i>
+                                                                <span className="text-xs text-slate-600 font-medium">Click to select PDF document</span>
+                                                                <span className="text-[10px] text-slate-400">PDF documents only</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-center gap-3">
+                                                        <span className="h-px bg-slate-200 flex-grow"></span> OR <span className="h-px bg-slate-200 flex-grow"></span>
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">PDF Document URL</label>
+                                                        <input 
+                                                            type="url" 
+                                                            placeholder="e.g. https://catbox.moe/outline.pdf" 
+                                                            value={outlineForm.outlineUrl && outlineForm.outlineUrl.startsWith('data:') ? '' : outlineForm.outlineUrl}
+                                                            onChange={e => setOutlineForm(prev => ({ ...prev, outlineUrl: e.target.value }))}
+                                                            className="w-full px-4 py-3 border border-slate-200 bg-slate-50/50 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-rose-500/20 transition-all text-sm shadow-sm font-mono text-xs"
+                                                        />
+                                                    </div>
+
+                                                    {outlineForm.outlineUrl && (
+                                                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3 animate-in fade-in">
+                                                            <div className="w-10 h-10 rounded bg-red-50 border border-red-200 flex-shrink-0 flex items-center justify-center text-red-500">
+                                                                <i className="fas fa-file-pdf text-lg"></i>
+                                                            </div>
+                                                            <div className="overflow-hidden">
+                                                                <p className="text-[10px] text-green-600 font-extrabold uppercase tracking-wide flex items-center gap-1"><i className="fas fa-check-circle"></i> Document Loaded</p>
+                                                                <p className="text-[9px] text-slate-400 truncate max-w-xs">{outlineForm.file ? outlineForm.file.name : (outlineForm.outlineUrl.startsWith('data:') ? 'Local PDF File' : outlineForm.outlineUrl)}</p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="col-span-1 sm:col-span-2 py-6 text-center flex flex-col items-center justify-center gap-4">
+                                                <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center shadow-lg border border-rose-100 mb-2">
+                                                    <i className="fas fa-lock text-2xl"></i>
+                                                </div>
+                                                <h4 className="font-extrabold text-slate-800 text-lg">🔒 Administrator Restricted</h4>
+                                                <p className="text-slate-500 text-sm max-w-md mx-auto leading-relaxed">
+                                                    Course outlines are official Stamford curriculum documents and can only be uploaded by administrators. All students can view published outlines inside the Course Outline viewer menu.
+                                                </p>
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => { setShowUploadModal(false); navigate('course-outline'); }}
+                                                    className="mt-4 px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-rose-600/10 active:scale-95 transform flex items-center gap-2"
+                                                >
+                                                    <i className="fas fa-file-pdf"></i> Browse Published Course Outlines
+                                                </button>
+                                            </div>
+                                        )
+                                    ) : uploadType === 'thesis' ? (
                                         <>
                                             <div className="space-y-5">
                                                 <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Thesis Title *</label><input value={uploadFormData.thesisTitle || ''} onChange={e => handleUploadChange('thesisTitle', e.target.value)} placeholder="Enter thesis title" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none" /></div>
@@ -3017,13 +3213,24 @@ export default function QVaultApp() {
                                 </div>
                                 <div className="mt-8 pt-6 border-t border-slate-100 flex justify-end gap-3">
                                     <button onClick={() => setShowUploadModal(false)} className="px-6 py-3 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 transition-colors">Cancel</button>
-                                    <button 
-                                        onClick={submitUpload} 
-                                        disabled={isUploading || isConvertingToPDF} 
-                                        className="px-8 py-3 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {isConvertingToPDF ? 'Converting...' : isUploading ? 'Uploading...' : 'Submit Content'}
-                                    </button>
+                                    {uploadType === 'outline' ? (
+                                        user === 'admin' && (
+                                            <button 
+                                                onClick={handleOutlineSubmit} 
+                                                className="px-8 py-3 rounded-xl text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-500/30 transition-all transform hover:-translate-y-0.5"
+                                            >
+                                                Publish Outline
+                                            </button>
+                                        )
+                                    ) : (
+                                        <button 
+                                            onClick={submitUpload} 
+                                            disabled={isUploading || isConvertingToPDF} 
+                                            className="px-8 py-3 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {isConvertingToPDF ? 'Converting...' : isUploading ? 'Uploading...' : 'Submit Content'}
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>
