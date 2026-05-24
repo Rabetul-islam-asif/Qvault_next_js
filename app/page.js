@@ -864,6 +864,24 @@ export default function QVaultApp() {
         if (!supabase) return;
         if (!confirm('Delete permanently?')) return;
         
+        // Clean up Supabase Storage file for deleted notice images
+        if (table === 'notices') {
+            const noticeObj = notices.find(n => n.id === id);
+            if (noticeObj && noticeObj.image_url && noticeObj.image_url.includes('/qvault-files/')) {
+                const parts = noticeObj.image_url.split('/qvault-files/');
+                if (parts.length > 1) {
+                    const filePath = parts[1];
+                    console.log('Cleaning up notice image from Supabase Storage:', filePath);
+                    const { error: storageErr } = await supabase.storage
+                        .from('qvault-files')
+                        .remove([filePath]);
+                    if (storageErr) {
+                        console.error('Failed to delete notice image from storage:', storageErr);
+                    }
+                }
+            }
+        }
+
         // Optimistic Update
         if (table === 'papers') {
             setPapers(prev => prev.filter(i => i.id !== id));
@@ -986,10 +1004,47 @@ export default function QVaultApp() {
             return;
         }
         if (confirm(`Are you sure you want to clean up ${expired.length} expired notices?`)) {
-            for (const notice of expired) {
-                await supabase.from('notices').delete().eq('id', notice.id);
+            // Optimistic update: filter out expired notices immediately
+            const expiredIds = expired.map(n => n.id);
+            setNotices(prev => prev.filter(n => !expiredIds.includes(n.id)));
+
+            try {
+                // 1. Gather all file paths from the expired notices that reside in our Supabase bucket
+                const filePathsToDelete = expired
+                    .filter(n => n.image_url && n.image_url.includes('/qvault-files/'))
+                    .map(n => {
+                        const parts = n.image_url.split('/qvault-files/');
+                        return parts.length > 1 ? parts[1] : null;
+                    })
+                    .filter(path => path !== null);
+
+                // 2. Clean up Supabase Storage files in a single bulk operation
+                if (filePathsToDelete.length > 0) {
+                    console.log('Cleaning up expired notice images from Supabase Storage:', filePathsToDelete);
+                    const { error: storageErr } = await supabase.storage
+                        .from('qvault-files')
+                        .remove(filePathsToDelete);
+                    if (storageErr) {
+                        console.error('Failed to delete expired notice images from storage:', storageErr);
+                    }
+                }
+
+                // 3. Delete notices from the database in a single bulk operation
+                const { error: dbErr } = await supabase.from('notices').delete().in('id', expiredIds);
+                if (dbErr) {
+                    throw dbErr;
+                }
+
+                showToast('Cleanup Complete', 'Expired notices and their storage files pruned successfully', 'success');
+            } catch (err) {
+                console.error('Cleanup Error:', err);
+                showToast('Error', 'Cleanup failed: ' + err.message, 'error');
+                // Revert notices state by refetching to ensure database consistency
+                const { data, error } = await supabase.from('notices').select('*');
+                if (!error && data) {
+                    setNotices(data);
+                }
             }
-            showToast('Cleanup Complete', 'Expired notices pruned successfully', 'success');
         }
     };
 
