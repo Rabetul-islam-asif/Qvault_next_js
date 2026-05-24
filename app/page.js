@@ -1072,11 +1072,11 @@ export default function QVaultApp() {
                         </div>
                         <div className="hidden md:flex md:items-center md:space-x-2">
                             <div className="flex items-center bg-slate-100/50 rounded-full p-1 border border-slate-200/50 mr-4">
-                                {['notices', 'vault', 'materials', 'thesis', 'faculty', 'blood-bank'].map(v => {
+                                {['notices', 'vault', 'course-outline', 'materials', 'thesis', 'faculty', 'blood-bank'].map(v => {
                                     const activeNoticesCount = notices.filter(n => new Date(n.expires_at) > new Date()).length;
                                     return (
                                         <a key={v} href="#" onClick={(e) => { e.preventDefault(); navigate(v); }} className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${view === v ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-indigo-600 hover:bg-white'}`}>
-                                            <span>{v === 'blood-bank' ? 'Blood Bank' : v === 'notices' ? 'Notices' : v.charAt(0).toUpperCase() + v.slice(1)}</span>
+                                            <span>{v === 'blood-bank' ? 'Blood Bank' : v === 'notices' ? 'Notices' : v === 'course-outline' ? 'Course Outline' : v.charAt(0).toUpperCase() + v.slice(1)}</span>
                                             {v === 'notices' && activeNoticesCount > 0 && (
                                                 <span className="relative flex h-2 w-2">
                                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -1108,6 +1108,9 @@ export default function QVaultApp() {
                                         <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
                                     </span>
                                 )}
+                            </button>
+                            <button onClick={() => navigate('course-outline')} className={`p-2.5 rounded-xl border relative ${view === 'course-outline' ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-slate-200 text-slate-600'}`} title="Course Outlines">
+                                <i className="fas fa-file-pdf text-sm"></i>
                             </button>
                             <button onClick={() => navigate('vault')} className="text-slate-600 bg-white border border-slate-200 p-2.5 rounded-xl"><i className="fas fa-search"></i></button>
                         </div>
@@ -1298,7 +1301,7 @@ export default function QVaultApp() {
                                         <p className="mt-4 text-base text-slate-500 sm:mt-5 sm:text-lg md:mt-5 md:text-xl leading-relaxed">Access a curated archive of past papers, slides, and class notes instantly.</p>
                                         <div className="mt-8 flex gap-3 flex-wrap justify-center lg:justify-start">
                                             <button onClick={() => navigate('vault')} className="px-5 py-2.5 rounded-xl font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-colors text-sm">Question Bank</button>
-                                            <button onClick={() => navigate('course-list')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Course List</button>
+                                            <button onClick={() => navigate('course-outline')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Course Outline</button>
                                             <button onClick={() => navigate('materials')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Materials</button>
                                             <button onClick={() => navigate('thesis')} className="px-5 py-2.5 rounded-xl font-medium text-purple-700 bg-purple-50 border border-purple-100 hover:bg-purple-100 transition-colors text-sm">Thesis</button>
                                             <button onClick={() => navigate('faculty')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Faculty</button>
@@ -1547,13 +1550,13 @@ export default function QVaultApp() {
                     </div>
                 )}
 
-                {/* COURSE LIST VIEW */}
-                {view === 'course-list' && (
+                {/* COURSE OUTLINES VIEW */}
+                {view === 'course-outline' && (
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
                         <div className="relative text-center mb-16">
                             <div className="text-center">
-                                <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">Course List</h2>
-                                <p className="mt-4 max-w-2xl mx-auto text-lg text-slate-500">Browse courses by department.</p>
+                                <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">Course Outlines</h2>
+                                <p className="mt-4 max-w-2xl mx-auto text-lg text-slate-500 font-medium">Browse dynamic PDF syllabus outlines by department.</p>
                             </div>
                             <div className="mt-8 max-w-md mx-auto">
                                 <select value={courseListDept} onChange={(e) => setCourseListDept(e.target.value)} className="block w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none shadow-sm">
