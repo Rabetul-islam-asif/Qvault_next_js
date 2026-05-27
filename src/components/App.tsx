@@ -169,11 +169,11 @@ export default function App() {
     <div className="bg-gray-50 text-gray-800 font-sans h-screen flex flex-col overflow-hidden">
       <Navigation onUploadClick={() => setUploadModalOpen(true)} onAdminClick={handleAdminClick} />
       
-      <main className="flex-1 overflow-y-auto custom-scrollbar relative" id="main-container">
+      <main className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-0" id="main-container">
         {renderCurrentPage()}
       </main>
 
-      <footer className="py-2 text-center text-xs text-gray-400 bg-gray-50 border-t border-gray-200">
+      <footer className="py-2.5 text-center text-xs text-gray-400 bg-gray-50 border-t border-gray-100 pb-22 md:pb-2.5">
         Developed by Asif Rabetul
       </footer>
 
@@ -215,16 +215,6 @@ export default function App() {
           </div>
         </div>
       )}
-
-      {/* Add Upload Button for mobile */}
-      <div className="md:hidden fixed bottom-6 right-6 z-40">
-        <button 
-          onClick={() => setUploadModalOpen(true)}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all"
-        >
-          <i className="fas fa-cloud-upload-alt"></i>
-        </button>
-      </div>
     </div>
   )
 }

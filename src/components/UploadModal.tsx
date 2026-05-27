@@ -71,18 +71,18 @@ export default function UploadModal({ isOpen, onClose }: { isOpen: boolean; onCl
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
         <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-md transition-opacity" onClick={onClose}></div>
         <div className="inline-block align-bottom bg-transparent rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full relative z-10">
-          <div className="bg-gradient-to-r from-indigo-600 to-blue-600 pt-8 pb-16 px-8 relative">
+          <div className="bg-gradient-to-r from-indigo-600 to-blue-600 pt-6 pb-14 px-5 sm:pt-8 sm:pb-16 sm:px-8 relative">
             <div className="flex justify-between items-start text-white">
               <div>
-                <h3 className="text-2xl font-bold tracking-tight">Submit Question Paper</h3>
-                <p className="text-indigo-100 text-sm ml-1">Help us build the ultimate academic archive.</p>
+                <h3 className="text-xl sm:text-2xl font-bold tracking-tight">Submit Question Paper</h3>
+                <p className="text-indigo-100 text-xs sm:text-sm ml-0.5">Help us build the ultimate academic archive.</p>
               </div>
-              <button onClick={onClose} className="text-white hover:bg-white/20 rounded-full p-2">
-                <i className="fas fa-times text-2xl"></i>
+              <button onClick={onClose} className="text-white hover:bg-white/20 rounded-full p-1.5 transition-colors">
+                <i className="fas fa-times text-xl"></i>
               </button>
             </div>
           </div>
-          <div className="bg-white -mt-8 mx-4 mb-4 rounded-xl shadow-lg px-8 py-8 relative">
+          <div className="bg-white -mt-8 mx-3.5 mb-4 rounded-xl shadow-lg px-4 py-5 sm:px-8 sm:py-8 relative">
             <form onSubmit={handleSubmit}>
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <div className="space-y-5">

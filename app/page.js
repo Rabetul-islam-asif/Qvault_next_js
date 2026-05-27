@@ -637,38 +637,27 @@ export default function QVaultApp() {
             
             setIsUploading(true);
             try {
-                console.log('Uploading file:', fileToUpload.name, 'Size:', fileToUpload.size, 'bytes');
+                console.log('Uploading PDF file programmatically to Catbox:', fileToUpload.name, 'Size:', fileToUpload.size, 'bytes');
                 
-                // Generate unique filename
-                const timestamp = Date.now();
-                const randomStr = Math.random().toString(36).substring(2, 8);
-                const fileName = `${uploadType}_${timestamp}_${randomStr}.pdf`;
-                const filePath = `uploads/${fileName}`;
-                
-                // Upload to Supabase Storage
-                console.log('Uploading to Supabase Storage...');
-                const { data: uploadData, error: uploadError } = await supabase.storage
-                    .from('qvault-files')
-                    .upload(filePath, fileToUpload, {
-                        cacheControl: '3600',
-                        upsert: false
-                    });
-                
-                if (uploadError) {
-                    console.error('Supabase upload error:', uploadError);
-                    throw new Error('Upload failed: ' + uploadError.message);
+                const catboxFd = new FormData();
+                catboxFd.append('file', fileToUpload);
+
+                const response = await fetch('/api/upload-catbox', {
+                    method: 'POST',
+                    body: catboxFd
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || 'Catbox upload failed');
                 }
-                
-                // Get public URL
-                const { data: urlData } = supabase.storage
-                    .from('qvault-files')
-                    .getPublicUrl(filePath);
-                
-                url = urlData.publicUrl;
-                console.log('File uploaded successfully:', url);
+
+                const data = await response.json();
+                url = data.url;
+                console.log('File uploaded to Catbox successfully:', url);
             } catch (e) {
-                console.error('Upload Error:', e);
-                showToast('Error', e.message || 'Upload failed', 'error');
+                console.error('Catbox Programmatic Upload Error:', e);
+                showToast('Upload Error', 'Programmatic Catbox upload failed: ' + e.message, 'error');
                 setIsUploading(false);
                 return;
             }
@@ -864,19 +853,24 @@ export default function QVaultApp() {
         if (!supabase) return;
         if (!confirm('Delete permanently?')) return;
         
-        // Clean up Supabase Storage file for deleted notice images
-        if (table === 'notices') {
-            const noticeObj = notices.find(n => n.id === id);
-            if (noticeObj && noticeObj.image_url && noticeObj.image_url.includes('/qvault-files/')) {
-                const parts = noticeObj.image_url.split('/qvault-files/');
+        // Clean up Supabase Storage file for deleted notice/teacher images
+        if (table === 'notices' || table === 'teachers') {
+            const itemObj = table === 'notices' 
+                ? notices.find(n => n.id === id)
+                : teachers.find(t => t.id === id);
+                
+            const imageUrl = table === 'notices' ? itemObj?.image_url : itemObj?.img;
+            
+            if (itemObj && imageUrl && imageUrl.includes('/qvault-files/')) {
+                const parts = imageUrl.split('/qvault-files/');
                 if (parts.length > 1) {
                     const filePath = parts[1];
-                    console.log('Cleaning up notice image from Supabase Storage:', filePath);
+                    console.log(`Cleaning up ${table} image from Supabase Storage:`, filePath);
                     const { error: storageErr } = await supabase.storage
                         .from('qvault-files')
                         .remove([filePath]);
                     if (storageErr) {
-                        console.error('Failed to delete notice image from storage:', storageErr);
+                        console.error(`Failed to delete ${table} image from storage:`, storageErr);
                     }
                 }
             }
@@ -1056,22 +1050,30 @@ export default function QVaultApp() {
                 alert('Please upload a PDF file only!');
                 return;
             }
-            const reader = new FileReader();
-            reader.onloadend = () => {
+            
+            if (file.size > 4.5 * 1024 * 1024) {
+                setShowCatboxTutorial(true);
+                alert('PDF size exceeds 4.5MB limit. Please upload manually to Catbox and paste the link below.');
                 setOutlineForm(prev => ({
                     ...prev,
-                    file: file,
-                    outlineUrl: reader.result
+                    file: null,
+                    outlineUrl: ''
                 }));
-            };
-            reader.readAsDataURL(file);
+                return;
+            }
+
+            setOutlineForm(prev => ({
+                ...prev,
+                file: file,
+                outlineUrl: 'Selected local PDF file'
+            }));
         }
     };
 
     const handleOutlineSubmit = async (e) => {
         e.preventDefault();
         if (!supabase) return;
-        if (!outlineForm.outlineUrl) {
+        if (!outlineForm.outlineUrl && !outlineForm.file) {
             alert('Please upload a PDF file or paste a direct PDF URL!');
             return;
         }
@@ -1080,13 +1082,48 @@ export default function QVaultApp() {
             return;
         }
 
+        let finalOutlineUrl = outlineForm.outlineUrl;
+
+        // If local file is uploaded, programmatically upload to Catbox!
+        if (outlineForm.file) {
+            if (outlineForm.file.size > 4.5 * 1024 * 1024) {
+                setShowCatboxTutorial(true);
+                alert('PDF size exceeds 4.5MB limit. Please upload manually to Catbox and paste the link.');
+                return;
+            }
+
+            try {
+                showToast('Uploading...', 'Uploading outline PDF to Catbox...', 'info');
+                const catboxFd = new FormData();
+                catboxFd.append('file', outlineForm.file);
+
+                const response = await fetch('/api/upload-catbox', {
+                    method: 'POST',
+                    body: catboxFd
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || 'Catbox upload failed');
+                }
+
+                const data = await response.json();
+                finalOutlineUrl = data.url;
+                console.log('Outline uploaded to Catbox successfully:', finalOutlineUrl);
+            } catch (err) {
+                console.error('Catbox Programmatic Outline Upload Error:', err);
+                alert('Failed to upload PDF programmatically: ' + err.message);
+                return;
+            }
+        }
+
         const courseObj = COURSE_DB.find(c => c.code === outlineForm.courseCode);
         const courseName = courseObj ? courseObj.name : outlineForm.courseCode;
 
         const outlineData = {
             course_code: outlineForm.courseCode,
             course_name: courseName,
-            outline_url: outlineForm.outlineUrl,
+            outline_url: finalOutlineUrl,
             created_at: new Date().toISOString()
         };
 
@@ -1117,16 +1154,43 @@ export default function QVaultApp() {
     const handleTeacherImgUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
+        if (!supabase) return;
+        
         setImgStatus('Uploading...');
-        const fd = new FormData(); fd.append('image', file);
         try {
-            const res = await fetch(`https://api.imgbb.com/1/upload?key=659c558f44d89bffc201c4e258836605`, { method: 'POST', body: fd });
-            const d = await res.json();
-            if (d.success) {
-                setTeacherForm(prev => ({ ...prev, img: d.data.url }));
-                setImgStatus('Done');
+            console.log('Uploading teacher image to Supabase Storage:', file.name);
+            const timestamp = Date.now();
+            const randomStr = Math.random().toString(36).substring(2, 8);
+            const extension = file.name.split('.').pop() || 'png';
+            const fileName = `teacher_${timestamp}_${randomStr}.${extension}`;
+            const filePath = `teachers/${fileName}`;
+
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('qvault-files')
+                .upload(filePath, file, {
+                    cacheControl: '365d',
+                    upsert: false
+                });
+
+            if (uploadError) {
+                throw new Error('Supabase Storage upload failed: ' + uploadError.message);
             }
-        } catch (e) { setImgStatus('Failed'); }
+
+            // Get public URL
+            const { data: urlData } = supabase.storage
+                .from('qvault-files')
+                .getPublicUrl(filePath);
+
+            const finalImageUrl = urlData.publicUrl;
+            console.log('Teacher image uploaded successfully to Supabase Storage:', finalImageUrl);
+            
+            setTeacherForm(prev => ({ ...prev, img: finalImageUrl }));
+            setImgStatus('Done');
+        } catch (error) {
+            console.error('Teacher upload error:', error);
+            setImgStatus('Failed');
+            showToast('Error', 'Image upload failed: ' + error.message, 'error');
+        }
     };
 
     const saveTeacher = async () => {

@@ -24,9 +24,9 @@ export default function LoginModal({ isOpen, onClose, onLogin }: {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 hidden flex items-center justify-center" style={{ display: 'flex' }}>
-      <div className="absolute inset-0 bg-gray-900/95" onClick={onClose}></div>
-      <div className="bg-white rounded-2xl p-8 w-full max-w-sm z-10 text-center border-t-4 border-indigo-600">
+    <div className="fixed inset-0 z-50 hidden flex items-center justify-center p-4" style={{ display: 'flex' }}>
+      <div className="absolute inset-0 bg-gray-900/95 backdrop-blur-sm" onClick={onClose}></div>
+      <div className="bg-white rounded-2xl p-6 sm:p-8 w-full max-w-sm mx-4 sm:mx-0 z-10 text-center border-t-4 border-indigo-600 shadow-2xl">
         <div className="mx-auto h-16 w-16 bg-gray-800 rounded-full flex items-center justify-center mb-4 shadow-lg">
           <i className="fas fa-lock text-indigo-400 text-2xl"></i>
         </div>

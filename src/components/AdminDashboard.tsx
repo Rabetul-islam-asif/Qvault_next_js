@@ -140,22 +140,22 @@ export default function AdminDashboard() {
         </button>
       </div>
       
-      <div className="border-b border-gray-200 mb-6">
-        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+      <div className="border-b border-gray-200 mb-6 overflow-x-auto custom-scrollbar">
+        <nav className="-mb-px flex space-x-6 min-w-max pb-0.5" aria-label="Tabs">
           <button 
             onClick={() => setActiveTab('uploads')}
-            className={`border-indigo-500 text-indigo-600 py-4 px-1 border-b-2 font-medium text-sm flex items-center ${
+            className={`py-3 px-1 border-b-2 font-semibold text-sm flex items-center transition-all ${
               activeTab === 'uploads' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
             Pending Uploads 
-            <span className="ml-2 bg-indigo-100 text-indigo-600 py-0.5 px-2.5 rounded-full text-xs">
+            <span className="ml-2 bg-indigo-50 text-indigo-600 py-0.5 px-2 rounded-full text-[10px] font-bold">
               {pending.length}
             </span>
           </button>
           <button 
             onClick={() => setActiveTab('papers')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center ${
+            className={`py-3 px-1 border-b-2 font-semibold text-sm flex items-center transition-all ${
               activeTab === 'papers' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -163,7 +163,7 @@ export default function AdminDashboard() {
           </button>
           <button 
             onClick={() => setActiveTab('faculty')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center ${
+            className={`py-3 px-1 border-b-2 font-semibold text-sm flex items-center transition-all ${
               activeTab === 'faculty' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -220,84 +220,147 @@ export default function AdminDashboard() {
 
       {/* Manage Papers */}
       <div className={`bg-white shadow overflow-hidden sm:rounded-md ${activeTab !== 'papers' ? 'hidden' : ''}`}>
-        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between">
-          <h3 className="font-medium">Active Database</h3>
+        <div className="px-4 py-3.5 sm:px-6 sm:py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center gap-3">
+          <h3 className="font-bold text-sm sm:text-base text-gray-800">Active Database</h3>
           <input 
             value={paperSearch}
             onChange={(e) => setPaperSearch(e.target.value)}
             placeholder="Search..." 
-            className="border rounded px-2 text-sm"
+            className="border border-gray-200 rounded-lg px-3 py-1 text-xs sm:text-sm focus:outline-none focus:border-indigo-500 w-36 sm:w-48 bg-white"
           />
         </div>
-        <table className="min-w-full divide-y divide-gray-200">
-          <tbody>
-            {filteredPapers.map((paper: any) => (
-              <tr key={paper.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {paper.courseCode}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {paper.courseName}<br/>
-                  <span className="text-xs text-gray-400">{paper.semester} | {paper.type}</span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button 
-                    onClick={() => handleDeletePaper(paper.id)}
-                    className="text-red-600 hover:text-red-900 font-bold"
-                  >
-                    <i className="fas fa-trash"></i> Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        
+        {/* Desktop Table View */}
+        <div className="hidden md:block">
+          <table className="min-w-full divide-y divide-gray-200">
+            <tbody>
+              {filteredPapers.map((paper: any) => (
+                <tr key={paper.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {paper.courseCode}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {paper.courseName}<br/>
+                    <span className="text-xs text-gray-400">{paper.semester} | {paper.type}</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button 
+                      onClick={() => handleDeletePaper(paper.id)}
+                      className="text-red-600 hover:text-red-900 font-bold cursor-pointer"
+                    >
+                      <i className="fas fa-trash"></i> Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile List View */}
+        <div className="block md:hidden divide-y divide-gray-100">
+          {filteredPapers.map((paper: any) => (
+            <div key={paper.id} className="p-4 flex justify-between items-center gap-3 bg-white">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="inline-block px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-100 text-indigo-700 text-[9px] font-bold">{paper.courseCode}</span>
+                  <span className="text-[9px] font-bold text-gray-400 uppercase">{paper.type}</span>
+                </div>
+                <h4 className="text-xs font-bold text-gray-900 leading-snug truncate">{paper.courseName}</h4>
+                <p className="text-[10px] text-gray-500 mt-0.5">{paper.semester}</p>
+              </div>
+              <button 
+                onClick={() => handleDeletePaper(paper.id)}
+                className="text-red-600 hover:text-red-700 text-xs font-bold shrink-0 flex items-center gap-1 py-1.5 px-2 bg-red-50 rounded-lg active:scale-95 transition-all cursor-pointer"
+              >
+                <i className="fas fa-trash"></i> Delete
+              </button>
+            </div>
+          ))}
+          {filteredPapers.length === 0 && (
+            <div className="p-8 text-center text-gray-400 text-xs italic">No papers found.</div>
+          )}
+        </div>
       </div>
 
-      {/* Manage Faculty */}
+          {/* Manage Faculty */}
       <div className={`bg-white shadow overflow-hidden sm:rounded-md ${activeTab !== 'faculty' ? 'hidden' : ''}`}>
-        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between">
-          <h3 className="font-medium">Faculty Members</h3>
+        <div className="px-4 py-3.5 sm:px-6 sm:py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+          <h3 className="font-bold text-sm sm:text-base text-gray-800">Faculty Members</h3>
           <button 
             onClick={() => openTeacherModal()}
-            className="bg-indigo-600 text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-indigo-700"
+            className="bg-indigo-600 text-white px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold hover:bg-indigo-700 shadow-sm transition-all cursor-pointer active:scale-95"
           >
             Add New
           </button>
         </div>
-        <table className="min-w-full divide-y divide-gray-200">
-          <tbody>
-            {teachers.map((teacher: any) => (
-              <tr key={teacher.id}>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="h-10 w-10 flex-shrink-0">
-                      <img className="h-10 w-10 rounded-full object-cover" src={teacher.img || 'https://via.placeholder.com/40'} alt={teacher.name} />
+        
+        {/* Desktop Table View */}
+        <div className="hidden md:block">
+          <table className="min-w-full divide-y divide-gray-200">
+            <tbody>
+              {teachers.map((teacher: any) => (
+                <tr key={teacher.id}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div className="h-10 w-10 flex-shrink-0">
+                        <img className="h-10 w-10 rounded-full object-cover shadow-sm border border-gray-150" src={teacher.img || 'https://via.placeholder.com/40'} alt={teacher.name} />
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-bold text-gray-900">{teacher.name}</div>
+                        <div className="text-xs text-gray-500">{teacher.dept}</div>
+                      </div>
                     </div>
-                    <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900">{teacher.name}</div>
-                      <div className="text-sm text-gray-500">{teacher.dept}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button 
-                    onClick={() => openTeacherModal(teacher)}
-                    className="text-indigo-600 hover:text-indigo-900 mr-3"
-                  >
-                    Edit
-                  </button>
-                  <button 
-                    onClick={() => handleDeleteTeacher(teacher.id)}
-                    className="text-red-600 hover:text-red-900"
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button 
+                      onClick={() => openTeacherModal(teacher)}
+                      className="text-indigo-600 hover:text-indigo-900 mr-3 font-semibold cursor-pointer"
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteTeacher(teacher.id)}
+                      className="text-red-600 hover:text-red-900 font-semibold cursor-pointer"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile List View */}
+        <div className="block md:hidden divide-y divide-gray-100">
+          {teachers.map((teacher: any) => (
+            <div key={teacher.id} className="p-4 flex justify-between items-center gap-3 bg-white">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <img className="h-10 w-10 rounded-full object-cover shrink-0 border border-gray-150 shadow-xs" src={teacher.img || 'https://via.placeholder.com/40'} alt={teacher.name} />
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-xs font-bold text-gray-900 truncate leading-snug">{teacher.name}</h4>
+                  <p className="text-[10px] text-gray-500 truncate mt-0.5">{teacher.dept}</p>
+                  <p className="text-[9px] text-gray-400 truncate">{teacher.designation}</p>
+                </div>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button 
+                  onClick={() => openTeacherModal(teacher)}
+                  className="text-indigo-600 hover:text-indigo-700 text-xs font-bold py-1.5 px-2 bg-indigo-50 rounded-lg active:scale-95 transition-all cursor-pointer"
+                >
+                  Edit
+                </button>
+                <button 
+                  onClick={() => handleDeleteTeacher(teacher.id)}
+                  className="text-red-600 hover:text-red-700 text-xs font-bold py-1.5 px-2 bg-red-50 rounded-lg active:scale-95 transition-all cursor-pointer"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Teacher Modal */}
