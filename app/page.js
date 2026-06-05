@@ -84,7 +84,8 @@ const DEPARTMENTS = [
 export default function QVaultApp() {
     // --- STATE ---
     const [supabase, setSupabase] = useState(null);
-    const [view, setView] = useState('notices');
+    const [view, setView] = useState('home');
+    const [showAllNoticesModal, setShowAllNoticesModal] = useState(false);
     const [teachers, setTeachers] = useState([]);
     const [papers, setPapers] = useState([]);
     const [materials, setMaterials] = useState([]);
@@ -1236,17 +1237,10 @@ export default function QVaultApp() {
                         </div>
                         <div className="hidden md:flex md:items-center md:space-x-2">
                             <div className="flex items-center bg-slate-100/50 rounded-full p-1 border border-slate-200/50 mr-4">
-                                {['notices', 'vault', 'course-outline', 'materials', 'thesis', 'faculty', 'blood-bank'].map(v => {
-                                    const activeNoticesCount = notices.filter(n => new Date(n.expires_at) > new Date()).length;
+                                {['vault', 'course-outline', 'materials', 'thesis', 'faculty', 'blood-bank'].map(v => {
                                     return (
                                         <a key={v} href="#" onClick={(e) => { e.preventDefault(); navigate(v); }} className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${view === v ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-indigo-600 hover:bg-white'}`}>
-                                            <span>{v === 'blood-bank' ? 'Blood Bank' : v === 'notices' ? 'Notices' : v === 'course-outline' ? 'Course Outline' : v.charAt(0).toUpperCase() + v.slice(1)}</span>
-                                            {v === 'notices' && activeNoticesCount > 0 && (
-                                                <span className="relative flex h-2 w-2">
-                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                                                </span>
-                                            )}
+                                            <span>{v === 'blood-bank' ? 'Blood Bank' : v === 'course-outline' ? 'Course Outline' : v.charAt(0).toUpperCase() + v.slice(1)}</span>
                                         </a>
                                     );
                                 })}
@@ -1264,15 +1258,6 @@ export default function QVaultApp() {
                         <div className="flex items-center md:hidden gap-3">
                             {deferredPrompt && <button onClick={installPWA} className="text-indigo-600 bg-indigo-50 border border-indigo-200 p-2.5 rounded-xl shadow-sm animate-pulse"><i className="fas fa-download"></i></button>}
                             <button onClick={() => { setUploadType('paper'); setShowUploadModal(true); }} className="text-white bg-indigo-600 shadow-indigo-500/30 shadow-md p-2.5 rounded-xl"><i className="fas fa-plus"></i></button>
-                            <button onClick={() => navigate('notices')} className={`p-2.5 rounded-xl border relative ${view === 'notices' ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-slate-200 text-slate-600'}`}>
-                                <i className="fas fa-bullhorn text-sm"></i>
-                                {notices.filter(n => new Date(n.expires_at) > new Date()).length > 0 && (
-                                    <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                                    </span>
-                                )}
-                            </button>
                             <button onClick={() => navigate('course-outline')} className={`p-2.5 rounded-xl border relative ${view === 'course-outline' ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-slate-200 text-slate-600'}`} title="Course Outlines">
                                 <i className="fas fa-file-pdf text-sm"></i>
                             </button>
@@ -1285,30 +1270,106 @@ export default function QVaultApp() {
             {/* Main Content */}
             <main className="flex-1 overflow-y-auto custom-scrollbar relative bg-slate-50">
                 
-                {/* NOTICES VIEW */}
-                {view === 'notices' && (
-                    <div className="fade-in max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 min-h-full">
-                        {/* Notice Header Section */}
-                        <div className="text-center md:text-left flex flex-col md:flex-row md:items-end justify-between border-b border-slate-200 pb-6 gap-4">
-                            <div>
-                                <div className="inline-flex items-center px-2.5 py-0.5 rounded-full border border-indigo-100 bg-indigo-50 text-indigo-600 text-[10px] font-bold uppercase tracking-wider mb-2">Notice Board</div>
-                                <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">University Announcements</h2>
-                                <p className="text-slate-500 mt-1 text-sm">Stay updated with the latest notices, exam schedules, and academic instructions.</p>
+
+
+                {/* HOME VIEW */}
+                {view === 'home' && (
+                    <div className="fade-in h-full">
+                        <div className="relative overflow-hidden bg-white pb-12 pt-16 sm:pb-24 lg:pb-32 lg:pt-24 border-b border-slate-100">
+                            <div className="absolute inset-0 z-0 opacity-30 pointer-events-none">
+                                <div className="absolute top-0 -left-4 w-72 h-72 bg-indigo-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse"></div>
+                                <div className="absolute top-0 -right-4 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse"></div>
                             </div>
-                            <div className="flex gap-3 justify-center md:justify-end">
-                                <button onClick={() => navigate('home')} className="px-5 py-2 rounded-xl text-slate-700 bg-white border border-slate-200 hover:border-slate-300 font-bold text-sm shadow-sm transition-all flex items-center gap-2"><i className="fas fa-home"></i> Back to Main</button>
-                                {user && <button onClick={() => { setAdminTab('notices'); navigate('admin'); }} className="px-5 py-2 rounded-xl text-white bg-slate-900 hover:bg-slate-800 font-bold text-sm shadow-md transition-all flex items-center gap-2"><i className="fas fa-plus"></i> Add Notice</button>}
+                            <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center lg:text-left">
+                                <div className="lg:grid lg:grid-cols-12 lg:gap-8 items-center">
+                                    <div className="sm:text-center md:max-w-2xl md:mx-auto lg:col-span-6 lg:text-left">
+                                        <div className="inline-flex items-center px-3 py-1 rounded-full border border-indigo-100 bg-indigo-50 text-indigo-600 text-xs font-bold uppercase tracking-widest mb-4 shadow-sm">Stamford University</div>
+                                        <h1 className="text-4xl tracking-tight font-extrabold text-slate-900 sm:text-5xl md:text-6xl lg:leading-tight">
+                                            Unlock your <br />
+                                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">academic history.</span>
+                                        </h1>
+                                        <p className="mt-4 text-base text-slate-500 sm:mt-5 sm:text-lg md:mt-5 md:text-xl leading-relaxed">Access a curated archive of past papers, slides, and class notes instantly.</p>
+                                        <div className="mt-8 flex gap-3 flex-wrap justify-center lg:justify-start">
+                                            <button onClick={() => navigate('vault')} className="px-5 py-2.5 rounded-xl font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-colors text-sm">Question Bank</button>
+                                            <button onClick={() => navigate('course-outline')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Course Outline</button>
+                                            <button onClick={() => navigate('materials')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Materials</button>
+                                            <button onClick={() => navigate('thesis')} className="px-5 py-2.5 rounded-xl font-medium text-purple-700 bg-purple-50 border border-purple-100 hover:bg-purple-100 transition-colors text-sm">Thesis</button>
+                                            <button onClick={() => navigate('faculty')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Faculty</button>
+                                            
+                                            <button onClick={() => navigate('blood-bank')} className="px-5 py-2.5 rounded-xl font-bold text-white bg-red-600 border border-red-700 hover:bg-red-700 shadow-md hover:shadow-lg transition-all text-sm flex items-center gap-2 transform hover:-translate-y-0.5">
+                                                <i className="fas fa-heartbeat animate-pulse"></i> Blood Bank
+                                            </button>
+                                        </div>
+
+                                        <div className="mt-8 relative max-w-lg">
+                                            <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl blur opacity-25"></div>
+                                            <div className="relative bg-white rounded-xl shadow-xl p-1 flex items-center border border-slate-100">
+                                                <i className="fas fa-search text-slate-400 ml-4 text-lg absolute left-0 z-10"></i>
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Search for courses, papers..." 
+                                                    className="w-full bg-transparent border-none focus:ring-0 outline-none text-slate-700 placeholder-slate-400 h-12 pl-12 pr-24 text-base font-medium"
+                                                    value={homeSearchQuery}
+                                                    onChange={(e) => setHomeSearchQuery(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' && homeSearchQuery.trim()) {
+                                                            setFilters(prev => ({ ...prev, vault: { ...prev.vault, search: homeSearchQuery } }));
+                                                            navigate('vault');
+                                                        }
+                                                    }}
+                                                />
+                                                <button 
+                                                    onClick={() => {
+                                                        if (homeSearchQuery.trim()) {
+                                                            setFilters(prev => ({ ...prev, vault: { ...prev.vault, search: homeSearchQuery } }));
+                                                            navigate('vault');
+                                                        }
+                                                    }}
+                                                    className="absolute right-1 top-1 bottom-1 bg-slate-900 text-white px-4 sm:px-6 rounded-lg font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20 flex items-center justify-center"
+                                                >
+                                                    Find
+                                                </button>
+                                            </div>
+                                        </div>
+
+
+                                    </div>
+                                    <div className="hidden lg:block lg:col-span-6">
+                                        <div className="relative mx-auto w-full rounded-2xl shadow-2xl lg:max-w-md overflow-hidden border border-slate-100 bg-white h-64 flex items-center justify-center bg-slate-50">
+                                            <img src="/stamford.jpg" alt="Stamford University" className="w-full h-full object-cover" />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+                            {/* NOTICE BOARD SECTION */}
+                            {(() => {
+                                const activeNotices = notices.filter(n => new Date(n.expires_at) > new Date());
+                                if (activeNotices.length === 0) return null;
+                                return (
+                                    <div className="mb-16">
+                                        <div className="flex justify-between items-center mb-6">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-1.5 h-7 bg-indigo-600 rounded-full"></div>
+                                                <h2 className="text-2xl font-bold text-slate-900">Notice Board</h2>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                {user && (
+                                                    <button onClick={() => { setAdminTab('notices'); navigate('admin'); }} className="text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 px-4 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5">
+                                                        <i className="fas fa-plus"></i> Add Notice
+                                                    </button>
+                                                )}
+                                                <button 
+                                                    onClick={() => setShowAllNoticesModal(true)} 
+                                                    className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 px-4 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5"
+                                                >
+                                                    <i className="fas fa-bullhorn"></i> See More ({activeNotices.length})
+                                                </button>
+                                            </div>
+                                        </div>
 
-                        {(() => {
-                            const activeNotices = notices.filter(n => new Date(n.expires_at) > new Date());
-                            const filteredNotices = activeNotices.filter(n => !noticeSearchQuery || n.title.toLowerCase().includes(noticeSearchQuery.toLowerCase()));
-
-                            return (
-                                <>
-                                    {/* Slider Section */}
-                                    {activeNotices.length > 0 ? (
+                                        {/* Slider Section */}
                                         <div 
                                             className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 shadow-xl max-w-4xl mx-auto aspect-[16/9] md:aspect-[21/9] group"
                                             onMouseEnter={() => setIsNoticeAutoplay(false)}
@@ -1387,150 +1448,10 @@ export default function QVaultApp() {
                                                 </div>
                                             )}
                                         </div>
-                                    ) : (
-                                        <div className="text-center py-16 bg-white border border-slate-200/60 rounded-2xl max-w-4xl mx-auto shadow-inner flex flex-col items-center justify-center">
-                                            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 mb-4 border border-slate-200/80"><i className="fas fa-bullhorn text-2xl"></i></div>
-                                            <h3 className="font-extrabold text-slate-800 text-lg">No Active Announcements</h3>
-                                            <p className="text-slate-400 text-sm mt-1 max-w-md">There are no university notices currently active. Check back later or notify an administrator.</p>
-                                        </div>
-                                    )}
-
-                                    {/* Notice Board Search and Grid */}
-                                    {activeNotices.length > 0 && (
-                                        <div className="space-y-6 max-w-5xl mx-auto">
-                                            <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200/70 shadow-sm justify-between">
-                                                <h3 className="font-bold text-slate-800 text-base flex items-center gap-2 self-start sm:self-center"><i className="fas fa-th-large text-indigo-500"></i> All Active Notices ({activeNotices.length})</h3>
-                                                <div className="relative w-full sm:w-80">
-                                                    <i className="fas fa-search absolute left-3 top-3 text-slate-400 text-sm"></i>
-                                                    <input 
-                                                        type="text" 
-                                                        placeholder="Search announcements..." 
-                                                        value={noticeSearchQuery}
-                                                        onChange={e => setNoticeSearchQuery(e.target.value)}
-                                                        className="w-full pl-9 pr-4 py-2 border border-slate-200 bg-slate-50/50 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all text-sm"
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            {filteredNotices.length === 0 ? (
-                                                <div className="text-center py-10 bg-slate-50 border border-dashed border-slate-300 rounded-2xl text-slate-400 text-sm">No notices match your search term.</div>
-                                            ) : (
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                                                    {filteredNotices.map(n => (
-                                                        <div key={n.id} className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col group hover:shadow-md hover:border-slate-300 transition-all">
-                                                            <div className="relative aspect-[4/3] bg-slate-950 overflow-hidden cursor-pointer" onClick={() => { setLightboxNotice(n); setShowNoticeLightbox(true); }}>
-                                                                <img src={n.image_url} alt={n.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                                                                <div className="absolute inset-0 bg-black/15 group-hover:bg-black/0 transition-colors"></div>
-                                                                <span className="absolute top-3 left-3 bg-red-600 text-white text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full tracking-wider flex items-center gap-1 shadow">
-                                                                    <i className="fas fa-clock animate-pulse"></i> 
-                                                                    {(() => {
-                                                                        const diff = new Date(n.expires_at) - new Date();
-                                                                        const hours = Math.floor(diff / (1000 * 60 * 60));
-                                                                        if (hours < 24) return hours <= 0 ? "Expiring" : `${hours}h left`;
-                                                                        return `${Math.ceil(hours / 24)}d left`;
-                                                                    })()}
-                                                                </span>
-                                                            </div>
-                                                            <div className="p-4 flex flex-col flex-grow justify-between gap-4">
-                                                                <div>
-                                                                    <h4 className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors line-clamp-2 flex items-center gap-1.5 flex-wrap">
-                                                                        <span>{n.title}</span>
-                                                                        {n.target_batch && n.target_batch !== 'All Students' ? (
-                                                                            <span className="inline-block bg-indigo-50 text-indigo-700 text-[8px] font-extrabold px-1.5 py-0.5 rounded border border-indigo-100 uppercase tracking-wide">Batch {n.target_batch}</span>
-                                                                        ) : (
-                                                                            <span className="inline-block bg-emerald-50 text-emerald-700 text-[8px] font-extrabold px-1.5 py-0.5 rounded border border-emerald-100 uppercase tracking-wide">All Students</span>
-                                                                        )}
-                                                                    </h4>
-                                                                    <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1"><i className="fas fa-calendar-alt"></i> Posted: {new Date(n.created_at).toLocaleDateString()}</p>
-                                                                </div>
-                                                                <div className="flex gap-2">
-                                                                    <button onClick={() => { setLightboxNotice(n); setShowNoticeLightbox(true); }} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5"><i className="fas fa-expand"></i> View</button>
-                                                                    <a href={n.image_url} target="_blank" rel="noopener noreferrer" className="px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center transition-colors shadow-sm" title="Open Image"><i className="fas fa-external-link-alt text-xs"></i></a>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </>
-                            );
-                        })()}
-                    </div>
-                )}
-
-                {/* HOME VIEW */}
-                {view === 'home' && (
-                    <div className="fade-in h-full">
-                        <div className="relative overflow-hidden bg-white pb-12 pt-16 sm:pb-24 lg:pb-32 lg:pt-24 border-b border-slate-100">
-                            <div className="absolute inset-0 z-0 opacity-30 pointer-events-none">
-                                <div className="absolute top-0 -left-4 w-72 h-72 bg-indigo-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse"></div>
-                                <div className="absolute top-0 -right-4 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse"></div>
-                            </div>
-                            <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center lg:text-left">
-                                <div className="lg:grid lg:grid-cols-12 lg:gap-8 items-center">
-                                    <div className="sm:text-center md:max-w-2xl md:mx-auto lg:col-span-6 lg:text-left">
-                                        <div className="inline-flex items-center px-3 py-1 rounded-full border border-indigo-100 bg-indigo-50 text-indigo-600 text-xs font-bold uppercase tracking-widest mb-4 shadow-sm">Stamford University</div>
-                                        <h1 className="text-4xl tracking-tight font-extrabold text-slate-900 sm:text-5xl md:text-6xl lg:leading-tight">
-                                            Unlock your <br />
-                                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">academic history.</span>
-                                        </h1>
-                                        <p className="mt-4 text-base text-slate-500 sm:mt-5 sm:text-lg md:mt-5 md:text-xl leading-relaxed">Access a curated archive of past papers, slides, and class notes instantly.</p>
-                                        <div className="mt-8 flex gap-3 flex-wrap justify-center lg:justify-start">
-                                            <button onClick={() => navigate('vault')} className="px-5 py-2.5 rounded-xl font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-colors text-sm">Question Bank</button>
-                                            <button onClick={() => navigate('course-outline')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Course Outline</button>
-                                            <button onClick={() => navigate('materials')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Materials</button>
-                                            <button onClick={() => navigate('thesis')} className="px-5 py-2.5 rounded-xl font-medium text-purple-700 bg-purple-50 border border-purple-100 hover:bg-purple-100 transition-colors text-sm">Thesis</button>
-                                            <button onClick={() => navigate('faculty')} className="px-5 py-2.5 rounded-xl font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">Faculty</button>
-                                            
-                                            <button onClick={() => navigate('blood-bank')} className="px-5 py-2.5 rounded-xl font-bold text-white bg-red-600 border border-red-700 hover:bg-red-700 shadow-md hover:shadow-lg transition-all text-sm flex items-center gap-2 transform hover:-translate-y-0.5">
-                                                <i className="fas fa-heartbeat animate-pulse"></i> Blood Bank
-                                            </button>
-                                        </div>
-
-                                        <div className="mt-8 relative max-w-lg">
-                                            <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl blur opacity-25"></div>
-                                            <div className="relative bg-white rounded-xl shadow-xl p-1 flex items-center border border-slate-100">
-                                                <i className="fas fa-search text-slate-400 ml-4 text-lg absolute left-0 z-10"></i>
-                                                <input 
-                                                    type="text" 
-                                                    placeholder="Search for courses, papers..." 
-                                                    className="w-full bg-transparent border-none focus:ring-0 outline-none text-slate-700 placeholder-slate-400 h-12 pl-12 pr-24 text-base font-medium"
-                                                    value={homeSearchQuery}
-                                                    onChange={(e) => setHomeSearchQuery(e.target.value)}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter' && homeSearchQuery.trim()) {
-                                                            setFilters(prev => ({ ...prev, vault: { ...prev.vault, search: homeSearchQuery } }));
-                                                            navigate('vault');
-                                                        }
-                                                    }}
-                                                />
-                                                <button 
-                                                    onClick={() => {
-                                                        if (homeSearchQuery.trim()) {
-                                                            setFilters(prev => ({ ...prev, vault: { ...prev.vault, search: homeSearchQuery } }));
-                                                            navigate('vault');
-                                                        }
-                                                    }}
-                                                    className="absolute right-1 top-1 bottom-1 bg-slate-900 text-white px-4 sm:px-6 rounded-lg font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20 flex items-center justify-center"
-                                                >
-                                                    Find
-                                                </button>
-                                            </div>
-                                        </div>
-
-
                                     </div>
-                                    <div className="hidden lg:block lg:col-span-6">
-                                        <div className="relative mx-auto w-full rounded-2xl shadow-2xl lg:max-w-md overflow-hidden border border-slate-100 bg-white h-64 flex items-center justify-center bg-slate-50">
-                                            <img src="/stamford.jpg" alt="Stamford University" className="w-full h-full object-cover" />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+                                );
+                            })()}
+
                             <h2 className="text-2xl font-bold text-slate-900 mb-8">Just Uploaded</h2>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
                                 {papers.length === 0 ? (
@@ -3475,6 +3396,93 @@ export default function QVaultApp() {
                             >
                                 Got It
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ALL NOTICES MODAL */}
+            {showAllNoticesModal && (
+                <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+                        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowAllNoticesModal(false)}></div>
+                        <div className="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-5xl sm:w-full relative z-10">
+                            <div className="bg-slate-900 pt-8 pb-16 px-8 relative overflow-hidden">
+                                <div className="flex justify-between items-start text-white relative z-10">
+                                    <div>
+                                        <h3 className="text-2xl font-bold tracking-tight">University Announcements</h3>
+                                        <p className="text-slate-400 text-sm mt-1">Stay updated with all active notices and academic instructions.</p>
+                                    </div>
+                                    <button onClick={() => setShowAllNoticesModal(false)} className="text-slate-400 hover:text-white hover:bg-white/10 rounded-full p-2 transition-colors">
+                                        <i className="fas fa-times text-xl"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="bg-white -mt-8 mx-4 mb-4 rounded-xl shadow-lg px-6 py-6 relative space-y-6">
+                                {(() => {
+                                    const activeNotices = notices.filter(n => new Date(n.expires_at) > new Date());
+                                    const filteredNotices = activeNotices.filter(n => !noticeSearchQuery || n.title.toLowerCase().includes(noticeSearchQuery.toLowerCase()));
+
+                                    return (
+                                        <>
+                                            <div className="flex flex-col sm:flex-row items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200/70 justify-between">
+                                                <h3 className="font-bold text-slate-800 text-base flex items-center gap-2"><i className="fas fa-th-large text-indigo-500"></i> Active Notices ({activeNotices.length})</h3>
+                                                <div className="relative w-full sm:w-80">
+                                                    <i className="fas fa-search absolute left-3 top-3 text-slate-400 text-sm"></i>
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="Search announcements..." 
+                                                        value={noticeSearchQuery}
+                                                        onChange={e => setNoticeSearchQuery(e.target.value)}
+                                                        className="w-full pl-9 pr-4 py-2 border border-slate-200 bg-white rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all text-sm"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {filteredNotices.length === 0 ? (
+                                                <div className="text-center py-10 border border-dashed border-slate-300 rounded-2xl text-slate-400 text-sm">No notices match your search term.</div>
+                                            ) : (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                                                    {filteredNotices.map(n => (
+                                                        <div key={n.id} className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col group hover:shadow-md hover:border-slate-300 transition-all">
+                                                            <div className="relative aspect-[4/3] bg-slate-950 overflow-hidden cursor-pointer" onClick={() => { setLightboxNotice(n); setShowNoticeLightbox(true); }}>
+                                                                <img src={n.image_url} alt={n.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                                                <div className="absolute inset-0 bg-black/15 group-hover:bg-black/0 transition-colors"></div>
+                                                                <span className="absolute top-3 left-3 bg-red-600 text-white text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full tracking-wider flex items-center gap-1 shadow">
+                                                                    <i className="fas fa-clock animate-pulse"></i> 
+                                                                    {(() => {
+                                                                        const diff = new Date(n.expires_at) - new Date();
+                                                                        const hours = Math.floor(diff / (1000 * 60 * 60));
+                                                                        if (hours < 24) return hours <= 0 ? "Expiring" : `${hours}h left`;
+                                                                        return `${Math.ceil(hours / 24)}d left`;
+                                                                    })()}
+                                                                </span>
+                                                            </div>
+                                                            <div className="p-4 flex flex-col flex-grow justify-between gap-4">
+                                                                <div>
+                                                                    <h4 className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors line-clamp-2 flex items-center gap-1.5 flex-wrap">
+                                                                        <span>{n.title}</span>
+                                                                        {n.target_batch && n.target_batch !== 'All Students' ? (
+                                                                            <span className="inline-block bg-indigo-50 text-indigo-700 text-[8px] font-extrabold px-1.5 py-0.5 rounded border border-indigo-100 uppercase tracking-wide">Batch {n.target_batch}</span>
+                                                                        ) : (
+                                                                            <span className="inline-block bg-emerald-50 text-emerald-700 text-[8px] font-extrabold px-1.5 py-0.5 rounded border border-emerald-100 uppercase tracking-wide">All Students</span>
+                                                                        )}
+                                                                    </h4>
+                                                                    <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1"><i className="fas fa-calendar-alt"></i> Posted: {new Date(n.created_at).toLocaleDateString()}</p>
+                                                                </div>
+                                                                <div className="flex gap-2">
+                                                                    <button onClick={() => { setLightboxNotice(n); setShowNoticeLightbox(true); }} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5"><i className="fas fa-expand"></i> View</button>
+                                                                    <a href={n.image_url} target="_blank" rel="noopener noreferrer" className="px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center transition-colors shadow-sm" title="Open Image"><i className="fas fa-external-link-alt text-xs"></i></a>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </>
+                                    );
+                                })()}
+                            </div>
                         </div>
                     </div>
                 </div>
