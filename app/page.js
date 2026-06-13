@@ -579,7 +579,7 @@ export default function QVaultApp() {
                 if (i > 0) pdf.addPage();
                 
                 // Add image to PDF
-                pdf.addImage(imageData, 'JPEG', x, y, width, height);
+                pdf.addImage(imageData, 'JPEG', x, y, width, height, undefined, 'FAST');
             }
             
             // Convert PDF to blob
@@ -612,6 +612,10 @@ export default function QVaultApp() {
             if (uploadFormData.courseMaterialsLink) {
                 url = uploadFormData.courseMaterialsLink;
             } else if (uploadFormData.pdfUploadLink) {
+                url = uploadFormData.pdfUploadLink;
+            }
+        } else if (uploadType === 'paper') {
+            if (uploadFormData.pdfUploadLink) {
                 url = uploadFormData.pdfUploadLink;
             }
         }
@@ -3139,25 +3143,27 @@ export default function QVaultApp() {
                                             </div>
                                         </>
                                     )}
-                                    {uploadType === 'material' && (
+                                    {uploadType !== 'thesis' && (
                                         <div className="space-y-4 bg-slate-50 border border-slate-200/85 p-5 rounded-2xl col-span-1 sm:col-span-2">
                                             <h4 className="text-xs font-bold text-slate-800 flex items-center gap-2 tracking-wide uppercase">
                                                 <i className="fas fa-link text-indigo-500 text-sm"></i> Direct Link Inputs
                                             </h4>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center justify-between">
-                                                        <span>Course Materials Link</span>
-                                                        {uploadFormData.matType === 'course_link' && <span className="text-[10px] text-red-500 font-bold tracking-normal lowercase">(Required for Course Link)</span>}
-                                                    </label>
-                                                    <input 
-                                                        value={uploadFormData.courseMaterialsLink || ''} 
-                                                        onChange={e => handleUploadChange('courseMaterialsLink', e.target.value)} 
-                                                        placeholder="e.g. Drive, OneDrive, Dropbox link" 
-                                                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none text-sm shadow-sm" 
-                                                    />
-                                                </div>
-                                                <div>
+                                                {uploadType === 'material' && (
+                                                    <div>
+                                                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex justify-between items-center">
+                                                            <span>Course Materials Link</span>
+                                                            {uploadFormData.matType === 'course_link' && <span className="text-[10px] text-red-500 font-bold tracking-normal lowercase">(Required for Course Link)</span>}
+                                                        </label>
+                                                        <input 
+                                                            value={uploadFormData.courseMaterialsLink || ''} 
+                                                            onChange={e => handleUploadChange('courseMaterialsLink', e.target.value)} 
+                                                            placeholder="e.g. Drive, OneDrive, Dropbox link" 
+                                                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none text-sm shadow-sm" 
+                                                        />
+                                                    </div>
+                                                )}
+                                                <div className={uploadType === 'paper' ? 'sm:col-span-2' : ''}>
                                                     <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex justify-between items-center">
                                                         <span>PDF Upload Link (PDF &gt; 4.5MB)</span>
                                                         <button 
@@ -3180,7 +3186,7 @@ export default function QVaultApp() {
                                                 </div>
                                             </div>
                                             <div className="text-[10px] text-slate-400 italic">
-                                                * Note: If you provide either link, file/image upload below becomes completely optional. Links save Supabase database storage!
+                                                * Note: If you provide {uploadType === 'material' ? 'either link' : 'a link'}, file/image upload below becomes completely optional. Links save Supabase database storage!
                                             </div>
                                         </div>
                                     )}

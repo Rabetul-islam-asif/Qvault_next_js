@@ -9,9 +9,12 @@ export async function POST(request) {
         }
 
         // Prepare multi-part form data to upload to Catbox API
+        const arrayBuffer = await file.arrayBuffer();
+        const blob = new Blob([arrayBuffer], { type: file.type });
+        
         const catboxFormData = new FormData();
         catboxFormData.append('reqtype', 'fileupload');
-        catboxFormData.append('fileToUpload', file);
+        catboxFormData.append('fileToUpload', blob, file.name || 'upload.pdf');
 
         console.log(`Forwarding file ${file.name} to Catbox API...`);
         const response = await fetch('https://catbox.moe/user/api.php', {
