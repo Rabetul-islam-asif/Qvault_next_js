@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const runtime = 'nodejs';
+
 export async function POST(request) {
     try {
         const formData = await request.formData();
@@ -8,32 +10,72 @@ export async function POST(request) {
             return NextResponse.json({ error: 'No file provided' }, { status: 400 });
         }
 
-        // Prepare multi-part form data to upload to Catbox API
         const arrayBuffer = await file.arrayBuffer();
-        const blob = new Blob([arrayBuffer], { type: file.type });
-        
-        const catboxFormData = new FormData();
-        catboxFormData.append('reqtype', 'fileupload');
-        catboxFormData.append('fileToUpload', blob, file.name || 'upload.pdf');
+        const buffer = Buffer.from(arrayBuffer);
+        const fileName = file.name || 'upload.pdf';
 
-        console.log(`Forwarding file ${file.name} to Catbox API...`);
+        // Manually construct multipart/form-data body
+        // This avoids Node.js FormData serialization issues with Catbox
+        const boundary = '----CatboxBoundary' + Date.now().toString(16);
+
+        const parts = [];
+
+        // reqtype field
+        parts.push(
+            `--${boundary}\r\n` +
+            `Content-Disposition: form-data; name="reqtype"\r\n\r\n` +
+            `fileupload\r\n`
+        );
+
+        // fileToUpload field header
+        parts.push(
+            `--${boundary}\r\n` +
+            `Content-Disposition: form-data; name="fileToUpload"; filename="${fileName}"\r\n` +
+            `Content-Type: application/octet-stream\r\n\r\n`
+        );
+
+        // Closing boundary
+        const closingBoundary = `\r\n--${boundary}--\r\n`;
+
+        // Combine into a single Buffer
+        const headerBuffers = parts.map(p => Buffer.from(p, 'utf-8'));
+        const closingBuffer = Buffer.from(closingBoundary, 'utf-8');
+
+        const body = Buffer.concat([
+            ...headerBuffers.slice(0, 1),   // reqtype part
+            headerBuffers[1],                // file header
+            buffer,                          // file data
+            closingBuffer                    // closing boundary
+        ]);
+
+        console.log(`Uploading ${fileName} (${buffer.length} bytes) to Catbox...`);
+
         const response = await fetch('https://catbox.moe/user/api.php', {
             method: 'POST',
-            body: catboxFormData,
+            headers: {
+                'Content-Type': `multipart/form-data; boundary=${boundary}`,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) QVault/1.0',
+            },
+            body: body,
         });
 
+        const responseText = await response.text();
+
         if (!response.ok) {
-            const errText = await response.text();
-            throw new Error(`Catbox API responded with error status ${response.status}: ${errText}`);
+            console.error('Catbox error:', response.status, responseText);
+            throw new Error(`Catbox API error ${response.status}: ${responseText}`);
         }
 
-        const fileUrl = await response.text();
-        const trimmedUrl = fileUrl.trim();
-        
-        console.log(`Catbox upload successful. File URL: ${trimmedUrl}`);
+        const trimmedUrl = responseText.trim();
+
+        if (!trimmedUrl.startsWith('http')) {
+            throw new Error('Catbox returned invalid URL: ' + trimmedUrl);
+        }
+
+        console.log(`Catbox upload successful: ${trimmedUrl}`);
         return NextResponse.json({ url: trimmedUrl });
     } catch (error) {
-        console.error('Catbox Proxy API Error:', error);
+        console.error('Catbox Proxy Error:', error);
         return NextResponse.json({ error: error.message || 'Catbox upload failed' }, { status: 500 });
     }
 }
