@@ -598,6 +598,75 @@ export default function QVaultApp() {
         }
     };
 
+    const uploadFileToCatboxClientSide = async (file) => {
+        const catboxFd = new FormData();
+        catboxFd.append('reqtype', 'fileupload');
+        catboxFd.append('fileToUpload', file);
+
+        console.log('Uploading file directly to Catbox using corsproxy.io as in version 46116c31d7356301764a094a70b08909f504d50e...', file.name);
+
+        // Try the exact URL format that worked in version 46116c31d7356301764a094a70b08909f504d50e
+        try {
+            console.log('Trying primary corsproxy.io upload...');
+            const response = await fetch('https://corsproxy.io/?' + encodeURIComponent('https://catbox.moe/user/api.php'), {
+                method: 'POST',
+                body: catboxFd
+            });
+
+            const text = await response.text();
+            console.log('Catbox response (corsproxy.io):', text);
+
+            if (text.trim().startsWith('http')) {
+                return text.trim();
+            }
+        } catch (proxyErr) {
+            console.warn('corsproxy.io failed:', proxyErr.message);
+        }
+
+        // Try backup proxies
+        const backupProxies = [
+            'https://corsproxy.io/?url=' + encodeURIComponent('https://catbox.moe/user/api.php'),
+            'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent('https://catbox.moe/user/api.php'),
+        ];
+
+        for (const proxyUrl of backupProxies) {
+            try {
+                console.log('Trying backup proxy:', proxyUrl.split('?')[0]);
+                const response = await fetch(proxyUrl, {
+                    method: 'POST',
+                    body: catboxFd
+                });
+
+                const text = await response.text();
+                console.log('Catbox backup proxy response:', text);
+
+                if (text.trim().startsWith('http')) {
+                    return text.trim();
+                }
+            } catch (backupErr) {
+                console.warn('Backup proxy failed:', backupErr.message);
+            }
+        }
+
+        // Fallback: try server-side route
+        try {
+            console.log('All CORS proxies failed. Trying server-side route...');
+            const serverFd = new FormData();
+            serverFd.append('file', file);
+            const serverRes = await fetch('/api/upload-catbox', { method: 'POST', body: serverFd });
+            if (serverRes.ok) {
+                const serverData = await serverRes.json();
+                if (serverData.url && serverData.url.startsWith('https://')) {
+                    return serverData.url;
+                }
+            }
+        } catch (serverErr) {
+            console.warn('Server-side route failed:', serverErr.message);
+        }
+
+        throw new Error('All upload channels failed. Please upload manually to catbox.moe.');
+    };
+
     const submitUpload = async () => {
         if (!supabase) return showToast('Error', 'Database connection not ready', 'error');
         
@@ -642,73 +711,11 @@ export default function QVaultApp() {
             
             setIsUploading(true);
             try {
-                console.log('Uploading PDF file to Catbox (client-side):', fileToUpload.name, 'Size:', fileToUpload.size, 'bytes');
-                
-                // Upload directly from the browser via CORS proxy
-                const catboxFd = new FormData();
-                catboxFd.append('reqtype', 'fileupload');
-                catboxFd.append('fileToUpload', fileToUpload, fileToUpload.name || 'upload.pdf');
-
-                const corsProxies = [
-                    'https://corsproxy.io/?url=' + encodeURIComponent('https://catbox.moe/user/api.php'),
-                    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent('https://catbox.moe/user/api.php'),
-                ];
-
-                let uploadSuccess = false;
-                let lastError = '';
-
-                for (const proxyUrl of corsProxies) {
-                    try {
-                        console.log('Trying CORS proxy:', proxyUrl.split('?')[0]);
-                        const response = await fetch(proxyUrl, {
-                            method: 'POST',
-                            body: catboxFd
-                        });
-
-                        const text = await response.text();
-                        console.log('Catbox response:', text);
-
-                        if (text.trim().startsWith('https://')) {
-                            url = text.trim();
-                            uploadSuccess = true;
-                            console.log('File uploaded to Catbox successfully:', url);
-                            break;
-                        } else {
-                            lastError = text || 'Invalid response from Catbox';
-                        }
-                    } catch (proxyErr) {
-                        console.warn('CORS proxy failed:', proxyErr.message);
-                        lastError = proxyErr.message;
-                    }
-                }
-
-                if (!uploadSuccess) {
-                    // Final fallback: try server-side route
-                    try {
-                        console.log('All CORS proxies failed. Trying server-side route...');
-                        const serverFd = new FormData();
-                        serverFd.append('file', fileToUpload);
-                        const serverRes = await fetch('/api/upload-catbox', { method: 'POST', body: serverFd });
-                        if (serverRes.ok) {
-                            const serverData = await serverRes.json();
-                            if (serverData.url && serverData.url.startsWith('https://')) {
-                                url = serverData.url;
-                                uploadSuccess = true;
-                                console.log('Server-side upload succeeded:', url);
-                            }
-                        }
-                    } catch (serverErr) {
-                        console.warn('Server-side route also failed:', serverErr.message);
-                    }
-                }
-
-                if (!uploadSuccess) {
-                    setShowCatboxTutorial(true);
-                    throw new Error('Automatic upload failed. Please upload manually to catbox.moe and paste the link.');
-                }
+                url = await uploadFileToCatboxClientSide(fileToUpload);
             } catch (e) {
                 console.error('Catbox Upload Error:', e);
                 showToast('Upload Error', e.message, 'error');
+                setShowCatboxTutorial(true);
                 setIsUploading(false);
                 return;
             }
@@ -1145,25 +1152,12 @@ export default function QVaultApp() {
 
             try {
                 showToast('Uploading...', 'Uploading outline PDF to Catbox...', 'info');
-                const catboxFd = new FormData();
-                catboxFd.append('file', outlineForm.file);
-
-                const response = await fetch('/api/upload-catbox', {
-                    method: 'POST',
-                    body: catboxFd
-                });
-
-                if (!response.ok) {
-                    const errData = await response.json();
-                    throw new Error(errData.error || 'Catbox upload failed');
-                }
-
-                const data = await response.json();
-                finalOutlineUrl = data.url;
+                finalOutlineUrl = await uploadFileToCatboxClientSide(outlineForm.file);
                 console.log('Outline uploaded to Catbox successfully:', finalOutlineUrl);
             } catch (err) {
                 console.error('Catbox Programmatic Outline Upload Error:', err);
                 alert('Failed to upload PDF programmatically: ' + err.message);
+                setShowCatboxTutorial(true);
                 return;
             }
         }
