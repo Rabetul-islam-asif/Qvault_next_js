@@ -642,27 +642,73 @@ export default function QVaultApp() {
             
             setIsUploading(true);
             try {
-                console.log('Uploading PDF file programmatically to Catbox:', fileToUpload.name, 'Size:', fileToUpload.size, 'bytes');
+                console.log('Uploading PDF file to Catbox (client-side):', fileToUpload.name, 'Size:', fileToUpload.size, 'bytes');
                 
+                // Upload directly from the browser via CORS proxy
                 const catboxFd = new FormData();
-                catboxFd.append('file', fileToUpload);
+                catboxFd.append('reqtype', 'fileupload');
+                catboxFd.append('fileToUpload', fileToUpload, fileToUpload.name || 'upload.pdf');
 
-                const response = await fetch('/api/upload-catbox', {
-                    method: 'POST',
-                    body: catboxFd
-                });
+                const corsProxies = [
+                    'https://corsproxy.io/?url=' + encodeURIComponent('https://catbox.moe/user/api.php'),
+                    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent('https://catbox.moe/user/api.php'),
+                ];
 
-                if (!response.ok) {
-                    const errData = await response.json();
-                    throw new Error(errData.error || 'Catbox upload failed');
+                let uploadSuccess = false;
+                let lastError = '';
+
+                for (const proxyUrl of corsProxies) {
+                    try {
+                        console.log('Trying CORS proxy:', proxyUrl.split('?')[0]);
+                        const response = await fetch(proxyUrl, {
+                            method: 'POST',
+                            body: catboxFd
+                        });
+
+                        const text = await response.text();
+                        console.log('Catbox response:', text);
+
+                        if (text.trim().startsWith('https://')) {
+                            url = text.trim();
+                            uploadSuccess = true;
+                            console.log('File uploaded to Catbox successfully:', url);
+                            break;
+                        } else {
+                            lastError = text || 'Invalid response from Catbox';
+                        }
+                    } catch (proxyErr) {
+                        console.warn('CORS proxy failed:', proxyErr.message);
+                        lastError = proxyErr.message;
+                    }
                 }
 
-                const data = await response.json();
-                url = data.url;
-                console.log('File uploaded to Catbox successfully:', url);
+                if (!uploadSuccess) {
+                    // Final fallback: try server-side route
+                    try {
+                        console.log('All CORS proxies failed. Trying server-side route...');
+                        const serverFd = new FormData();
+                        serverFd.append('file', fileToUpload);
+                        const serverRes = await fetch('/api/upload-catbox', { method: 'POST', body: serverFd });
+                        if (serverRes.ok) {
+                            const serverData = await serverRes.json();
+                            if (serverData.url && serverData.url.startsWith('https://')) {
+                                url = serverData.url;
+                                uploadSuccess = true;
+                                console.log('Server-side upload succeeded:', url);
+                            }
+                        }
+                    } catch (serverErr) {
+                        console.warn('Server-side route also failed:', serverErr.message);
+                    }
+                }
+
+                if (!uploadSuccess) {
+                    setShowCatboxTutorial(true);
+                    throw new Error('Automatic upload failed. Please upload manually to catbox.moe and paste the link.');
+                }
             } catch (e) {
-                console.error('Catbox Programmatic Upload Error:', e);
-                showToast('Upload Error', 'Programmatic Catbox upload failed: ' + e.message, 'error');
+                console.error('Catbox Upload Error:', e);
+                showToast('Upload Error', e.message, 'error');
                 setIsUploading(false);
                 return;
             }
