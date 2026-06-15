@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 
-export const runtime = 'nodejs';
+// Use Edge runtime - it uses Web API FormData (like a browser)
+// and runs on CDN edge nodes, not datacenter IPs that Catbox blocks
+export const runtime = 'edge';
 
 export async function POST(request) {
     try {
@@ -10,72 +12,46 @@ export async function POST(request) {
             return NextResponse.json({ error: 'No file provided' }, { status: 400 });
         }
 
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        const fileName = file.name || 'upload.pdf';
+        console.log(`Uploading ${file.name} (${file.size} bytes) to Catbox via Edge...`);
 
-        // Manually construct multipart/form-data body
-        // This avoids Node.js FormData serialization issues with Catbox
-        const boundary = '----CatboxBoundary' + Date.now().toString(16);
+        // Build FormData exactly as Catbox expects
+        const catboxForm = new FormData();
+        catboxForm.append('reqtype', 'fileupload');
+        catboxForm.append('fileToUpload', file, file.name || 'upload.pdf');
 
-        const parts = [];
-
-        // reqtype field
-        parts.push(
-            `--${boundary}\r\n` +
-            `Content-Disposition: form-data; name="reqtype"\r\n\r\n` +
-            `fileupload\r\n`
-        );
-
-        // fileToUpload field header
-        parts.push(
-            `--${boundary}\r\n` +
-            `Content-Disposition: form-data; name="fileToUpload"; filename="${fileName}"\r\n` +
-            `Content-Type: application/octet-stream\r\n\r\n`
-        );
-
-        // Closing boundary
-        const closingBoundary = `\r\n--${boundary}--\r\n`;
-
-        // Combine into a single Buffer
-        const headerBuffers = parts.map(p => Buffer.from(p, 'utf-8'));
-        const closingBuffer = Buffer.from(closingBoundary, 'utf-8');
-
-        const body = Buffer.concat([
-            ...headerBuffers.slice(0, 1),   // reqtype part
-            headerBuffers[1],                // file header
-            buffer,                          // file data
-            closingBuffer                    // closing boundary
-        ]);
-
-        console.log(`Uploading ${fileName} (${buffer.length} bytes) to Catbox...`);
-
+        // Upload directly to Catbox - Edge runtime handles FormData natively
         const response = await fetch('https://catbox.moe/user/api.php', {
             method: 'POST',
-            headers: {
-                'Content-Type': `multipart/form-data; boundary=${boundary}`,
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) QVault/1.0',
-            },
-            body: body,
+            body: catboxForm,
         });
 
         const responseText = await response.text();
+        console.log('Catbox response:', response.status, responseText.substring(0, 200));
 
         if (!response.ok) {
             console.error('Catbox error:', response.status, responseText);
-            throw new Error(`Catbox API error ${response.status}: ${responseText}`);
+            return NextResponse.json(
+                { error: `Catbox API error ${response.status}: ${responseText.substring(0, 100)}` },
+                { status: 502 }
+            );
         }
 
         const trimmedUrl = responseText.trim();
 
         if (!trimmedUrl.startsWith('http')) {
-            throw new Error('Catbox returned invalid URL: ' + trimmedUrl);
+            return NextResponse.json(
+                { error: 'Catbox returned invalid response: ' + trimmedUrl.substring(0, 100) },
+                { status: 502 }
+            );
         }
 
-        console.log(`Catbox upload successful: ${trimmedUrl}`);
+        console.log('Catbox upload successful:', trimmedUrl);
         return NextResponse.json({ url: trimmedUrl });
     } catch (error) {
         console.error('Catbox Proxy Error:', error);
-        return NextResponse.json({ error: error.message || 'Catbox upload failed' }, { status: 500 });
+        return NextResponse.json(
+            { error: error.message || 'Catbox upload failed' },
+            { status: 500 }
+        );
     }
 }

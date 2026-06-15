@@ -598,73 +598,26 @@ export default function QVaultApp() {
         }
     };
 
-    const uploadFileToCatboxClientSide = async (file) => {
-        const catboxFd = new FormData();
-        catboxFd.append('reqtype', 'fileupload');
-        catboxFd.append('fileToUpload', file);
-
-        console.log('Uploading file directly to Catbox using corsproxy.io as in version 46116c31d7356301764a094a70b08909f504d50e...', file.name);
-
-        // Try the exact URL format that worked in version 46116c31d7356301764a094a70b08909f504d50e
-        try {
-            console.log('Trying primary corsproxy.io upload...');
-            const response = await fetch('https://corsproxy.io/?' + encodeURIComponent('https://catbox.moe/user/api.php'), {
-                method: 'POST',
-                body: catboxFd
-            });
-
-            const text = await response.text();
-            console.log('Catbox response (corsproxy.io):', text);
-
-            if (text.trim().startsWith('http')) {
-                return text.trim();
+    const uploadFileToCatbox = async (file) => {
+        console.log('Uploading to Catbox:', file.name, 'Size:', file.size, 'bytes');
+        
+        // Use server-side Edge route (avoids CORS + uses Web API FormData)
+        const serverFd = new FormData();
+        serverFd.append('file', file);
+        
+        const serverRes = await fetch('/api/upload-catbox', { method: 'POST', body: serverFd });
+        
+        if (serverRes.ok) {
+            const serverData = await serverRes.json();
+            if (serverData.url && serverData.url.startsWith('https://')) {
+                console.log('Catbox upload success:', serverData.url);
+                return serverData.url;
             }
-        } catch (proxyErr) {
-            console.warn('corsproxy.io failed:', proxyErr.message);
+            throw new Error(serverData.error || 'Catbox returned invalid URL');
         }
-
-        // Try backup proxies
-        const backupProxies = [
-            'https://corsproxy.io/?url=' + encodeURIComponent('https://catbox.moe/user/api.php'),
-            'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent('https://catbox.moe/user/api.php'),
-        ];
-
-        for (const proxyUrl of backupProxies) {
-            try {
-                console.log('Trying backup proxy:', proxyUrl.split('?')[0]);
-                const response = await fetch(proxyUrl, {
-                    method: 'POST',
-                    body: catboxFd
-                });
-
-                const text = await response.text();
-                console.log('Catbox backup proxy response:', text);
-
-                if (text.trim().startsWith('http')) {
-                    return text.trim();
-                }
-            } catch (backupErr) {
-                console.warn('Backup proxy failed:', backupErr.message);
-            }
-        }
-
-        // Fallback: try server-side route
-        try {
-            console.log('All CORS proxies failed. Trying server-side route...');
-            const serverFd = new FormData();
-            serverFd.append('file', file);
-            const serverRes = await fetch('/api/upload-catbox', { method: 'POST', body: serverFd });
-            if (serverRes.ok) {
-                const serverData = await serverRes.json();
-                if (serverData.url && serverData.url.startsWith('https://')) {
-                    return serverData.url;
-                }
-            }
-        } catch (serverErr) {
-            console.warn('Server-side route failed:', serverErr.message);
-        }
-
-        throw new Error('All upload channels failed. Please upload manually to catbox.moe.');
+        
+        const errData = await serverRes.json().catch(() => ({ error: `HTTP ${serverRes.status}` }));
+        throw new Error(errData.error || `Upload failed (${serverRes.status})`);
     };
 
     const submitUpload = async () => {
@@ -703,15 +656,15 @@ export default function QVaultApp() {
                 return showToast('Error', 'Please select a PDF file, select images, or provide a link', 'error');
             }
             
-            // Check size limits before uploading
+            // Check size limits - Catbox limit via API
             if (fileToUpload.size > 4.5 * 1024 * 1024) {
                 setShowCatboxTutorial(true);
-                return showToast('File Too Large', 'PDF size exceeds 4.5MB limit. Please upload manually.', 'error');
+                return showToast('File Too Large', 'PDF exceeds 4.5MB. Please upload manually to Catbox.', 'error');
             }
             
             setIsUploading(true);
             try {
-                url = await uploadFileToCatboxClientSide(fileToUpload);
+                url = await uploadFileToCatbox(fileToUpload);
             } catch (e) {
                 console.error('Catbox Upload Error:', e);
                 showToast('Upload Error', e.message, 'error');
@@ -1152,7 +1105,7 @@ export default function QVaultApp() {
 
             try {
                 showToast('Uploading...', 'Uploading outline PDF to Catbox...', 'info');
-                finalOutlineUrl = await uploadFileToCatboxClientSide(outlineForm.file);
+                finalOutlineUrl = await uploadFileToCatbox(outlineForm.file);
                 console.log('Outline uploaded to Catbox successfully:', finalOutlineUrl);
             } catch (err) {
                 console.error('Catbox Programmatic Outline Upload Error:', err);
