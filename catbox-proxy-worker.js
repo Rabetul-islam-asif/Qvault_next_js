@@ -49,10 +49,17 @@ export default {
             catboxForm.append('reqtype', 'fileupload');
             catboxForm.append('fileToUpload', file, file.name || 'upload.pdf');
 
-            // Forward to Catbox
+            // Forward to Catbox with browser-like headers
+            // (Catbox is behind Cloudflare — without User-Agent it returns 520)
             const catboxRes = await fetch('https://catbox.moe/user/api.php', {
                 method: 'POST',
                 body: catboxForm,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+                    'Accept': '*/*',
+                    'Origin': 'https://catbox.moe',
+                    'Referer': 'https://catbox.moe/',
+                },
             });
 
             const responseText = await catboxRes.text();

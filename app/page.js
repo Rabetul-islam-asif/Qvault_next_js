@@ -8,9 +8,9 @@ import Papa from 'papaparse';
 const SUPABASE_URL = 'https://nfahvsssiokaprylfrxv.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mYWh2c3NzaW9rYXByeWxmcnh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzNDg2MDEsImV4cCI6MjA3OTkyNDYwMX0.yiq_rqI7_EDNX3eAnK50pgafFjZICoCrhnf8IStwpKs';
 
-// --- CATBOX UPLOAD via Cloudflare Worker ---
-// Deploy catbox-proxy-worker.js to Cloudflare Workers (free) and paste your URL here:
-const CATBOX_WORKER_URL = 'https://aged-dream-6209.bd71asifrabetul.workers.dev';
+// --- UPLOAD CONFIGURATION ---
+// Files under 4.5MB are uploaded directly to Supabase Storage.
+// Files over 4.5MB show a tutorial directing the user to upload manually to Catbox and paste the link.
 
 // --- COURSE DATABASE ---
 const COURSE_DB = [
@@ -602,30 +602,32 @@ export default function QVaultApp() {
         }
     };
 
-    const uploadFileToCatbox = async (file) => {
-        console.log('Uploading to Catbox via Cloudflare Worker:', file.name, 'Size:', file.size, 'bytes');
+    const uploadFileToStorage = async (file) => {
+        console.log('Uploading to Supabase Storage:', file.name, 'Size:', file.size, 'bytes');
         
-        // Upload directly to Cloudflare Worker (bypasses Vercel entirely)
-        const fd = new FormData();
-        fd.append('file', file);
-        
-        const res = await fetch(CATBOX_WORKER_URL, {
-            method: 'POST',
-            body: fd,
-        });
-        
-        if (!res.ok) {
-            const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-            throw new Error(errData.error || `Upload failed (${res.status})`);
+        const timestamp = Date.now();
+        const randomStr = Math.random().toString(36).substring(2, 8);
+        const extension = file.name.split('.').pop() || 'pdf';
+        const fileName = `paper_${timestamp}_${randomStr}.${extension}`;
+        const filePath = `pdfs/${fileName}`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('qvault-files')
+            .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: false
+            });
+
+        if (uploadError) {
+            throw new Error('Supabase Storage upload failed: ' + uploadError.message);
         }
-        
-        const data = await res.json();
-        if (data.url && data.url.startsWith('https://')) {
-            console.log('Catbox upload success:', data.url);
-            return data.url;
-        }
-        
-        throw new Error(data.error || 'Catbox returned invalid URL');
+
+        const { data: urlData } = supabase.storage
+            .from('qvault-files')
+            .getPublicUrl(filePath);
+
+        console.log('Upload success. Public URL:', urlData.publicUrl);
+        return urlData.publicUrl;
     };
 
     const submitUpload = async () => {
@@ -672,9 +674,9 @@ export default function QVaultApp() {
             
             setIsUploading(true);
             try {
-                url = await uploadFileToCatbox(fileToUpload);
+                url = await uploadFileToStorage(fileToUpload);
             } catch (e) {
-                console.error('Catbox Upload Error:', e);
+                console.error('Upload Error:', e);
                 showToast('Upload Error', e.message, 'error');
                 setShowCatboxTutorial(true);
                 setIsUploading(false);
@@ -1103,7 +1105,7 @@ export default function QVaultApp() {
 
         let finalOutlineUrl = outlineForm.outlineUrl;
 
-        // If local file is uploaded, programmatically upload to Catbox!
+        // If local file is uploaded, programmatically upload to storage!
         if (outlineForm.file) {
             if (outlineForm.file.size > 4.5 * 1024 * 1024) {
                 setShowCatboxTutorial(true);
@@ -1112,11 +1114,11 @@ export default function QVaultApp() {
             }
 
             try {
-                showToast('Uploading...', 'Uploading outline PDF to Catbox...', 'info');
-                finalOutlineUrl = await uploadFileToCatbox(outlineForm.file);
-                console.log('Outline uploaded to Catbox successfully:', finalOutlineUrl);
+                showToast('Uploading...', 'Uploading outline PDF to storage...', 'info');
+                finalOutlineUrl = await uploadFileToStorage(outlineForm.file);
+                console.log('Outline uploaded successfully:', finalOutlineUrl);
             } catch (err) {
-                console.error('Catbox Programmatic Outline Upload Error:', err);
+                console.error('Outline Upload Error:', err);
                 alert('Failed to upload PDF programmatically: ' + err.message);
                 setShowCatboxTutorial(true);
                 return;
