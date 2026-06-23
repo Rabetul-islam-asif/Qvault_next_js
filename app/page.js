@@ -10,7 +10,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 // --- CATBOX UPLOAD via Cloudflare Worker ---
 // Deploy catbox-proxy-worker.js to Cloudflare Workers (free) and paste your URL here:
-const CATBOX_WORKER_URL = 'https://catbox-proxy.YOUR_SUBDOMAIN.workers.dev';
+const CATBOX_WORKER_URL = 'https://aged-dream-6209.bd71asifrabetul.workers.dev';
 
 // --- COURSE DATABASE ---
 const COURSE_DB = [
