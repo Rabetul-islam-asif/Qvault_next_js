@@ -8,6 +8,10 @@ import Papa from 'papaparse';
 const SUPABASE_URL = 'https://nfahvsssiokaprylfrxv.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mYWh2c3NzaW9rYXByeWxmcnh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzNDg2MDEsImV4cCI6MjA3OTkyNDYwMX0.yiq_rqI7_EDNX3eAnK50pgafFjZICoCrhnf8IStwpKs';
 
+// --- CATBOX UPLOAD via Cloudflare Worker ---
+// Deploy catbox-proxy-worker.js to Cloudflare Workers (free) and paste your URL here:
+const CATBOX_WORKER_URL = 'https://catbox-proxy.YOUR_SUBDOMAIN.workers.dev';
+
 // --- COURSE DATABASE ---
 const COURSE_DB = [
     { code: "0031CSE320", name: "Technical Writing and Research Methodology", credits: 3, type: "theory" },
@@ -599,25 +603,29 @@ export default function QVaultApp() {
     };
 
     const uploadFileToCatbox = async (file) => {
-        console.log('Uploading to Catbox:', file.name, 'Size:', file.size, 'bytes');
+        console.log('Uploading to Catbox via Cloudflare Worker:', file.name, 'Size:', file.size, 'bytes');
         
-        // Use server-side Edge route (avoids CORS + uses Web API FormData)
-        const serverFd = new FormData();
-        serverFd.append('file', file);
+        // Upload directly to Cloudflare Worker (bypasses Vercel entirely)
+        const fd = new FormData();
+        fd.append('file', file);
         
-        const serverRes = await fetch('/api/upload-catbox', { method: 'POST', body: serverFd });
+        const res = await fetch(CATBOX_WORKER_URL, {
+            method: 'POST',
+            body: fd,
+        });
         
-        if (serverRes.ok) {
-            const serverData = await serverRes.json();
-            if (serverData.url && serverData.url.startsWith('https://')) {
-                console.log('Catbox upload success:', serverData.url);
-                return serverData.url;
-            }
-            throw new Error(serverData.error || 'Catbox returned invalid URL');
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+            throw new Error(errData.error || `Upload failed (${res.status})`);
         }
         
-        const errData = await serverRes.json().catch(() => ({ error: `HTTP ${serverRes.status}` }));
-        throw new Error(errData.error || `Upload failed (${serverRes.status})`);
+        const data = await res.json();
+        if (data.url && data.url.startsWith('https://')) {
+            console.log('Catbox upload success:', data.url);
+            return data.url;
+        }
+        
+        throw new Error(data.error || 'Catbox returned invalid URL');
     };
 
     const submitUpload = async () => {
