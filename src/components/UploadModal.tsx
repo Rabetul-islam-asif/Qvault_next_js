@@ -2,7 +2,7 @@
 
 import { useAppStore } from '@/lib/store'
 import { departments, years, seasons, examTypes, theoryCourses, labCourses } from '@/lib/constants'
-import { uploadToCatbox, submitPendingPaper } from '@/lib/api'
+import { uploadToGoogleDrive, submitPendingPaper } from '@/lib/api'
 import { useState } from 'react'
 
 export default function UploadModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
@@ -38,7 +38,7 @@ export default function UploadModal({ isOpen, onClose }: { isOpen: boolean; onCl
 
     setUploading(true)
     try {
-      const fileUrl = await uploadToCatbox(formData.file)
+      const fileUrl = await uploadToGoogleDrive(formData.file)
       const fullSemester = `${formData.semSeason} ${formData.semYear}`
       
       await submitPendingPaper({

@@ -512,10 +512,9 @@ export default function QVaultApp() {
             setUploadFile(null); // Clear any previous PDF
             e.target.value = ''; // Reset input to allow selecting same file again
         } else if (firstFile.type === 'application/pdf') {
-            // Check if size is larger than 4.5 MB
-            if (firstFile.size > 4.5 * 1024 * 1024) {
-                setShowCatboxTutorial(true);
-                showToast('File Too Large', 'PDF size exceeds 4.5MB. Please upload manually.', 'error');
+            // Check if size is larger than 50 MB
+            if (firstFile.size > 50 * 1024 * 1024) {
+                showToast('File Too Large', 'PDF size exceeds 50MB.', 'error');
                 e.target.value = ''; // Reset input
                 return;
             }
@@ -603,31 +602,23 @@ export default function QVaultApp() {
     };
 
     const uploadFileToStorage = async (file) => {
-        console.log('Uploading to Supabase Storage:', file.name, 'Size:', file.size, 'bytes');
+        console.log('Uploading to Google Drive:', file.name, 'Size:', file.size, 'bytes');
         
-        const timestamp = Date.now();
-        const randomStr = Math.random().toString(36).substring(2, 8);
-        const extension = file.name.split('.').pop() || 'pdf';
-        const fileName = `paper_${timestamp}_${randomStr}.${extension}`;
-        const filePath = `pdfs/${fileName}`;
+        const formData = new FormData();
+        formData.append('file', file);
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('qvault-files')
-            .upload(filePath, file, {
-                cacheControl: '3600',
-                upsert: false
-            });
+        const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+        });
 
-        if (uploadError) {
-            throw new Error('Supabase Storage upload failed: ' + uploadError.message);
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Google Drive upload failed');
         }
 
-        const { data: urlData } = supabase.storage
-            .from('qvault-files')
-            .getPublicUrl(filePath);
-
-        console.log('Upload success. Public URL:', urlData.publicUrl);
-        return urlData.publicUrl;
+        console.log('Upload success. Public URL:', data.fileUrl);
+        return data.fileUrl;
     };
 
     const submitUpload = async () => {
@@ -666,10 +657,9 @@ export default function QVaultApp() {
                 return showToast('Error', 'Please select a PDF file, select images, or provide a link', 'error');
             }
             
-            // Check size limits - Catbox limit via API
-            if (fileToUpload.size > 4.5 * 1024 * 1024) {
-                setShowCatboxTutorial(true);
-                return showToast('File Too Large', 'PDF exceeds 4.5MB. Please upload manually to Catbox.', 'error');
+            // Check size limits
+            if (fileToUpload.size > 50 * 1024 * 1024) {
+                return showToast('File Too Large', 'PDF exceeds 50MB limit.', 'error');
             }
             
             setIsUploading(true);
