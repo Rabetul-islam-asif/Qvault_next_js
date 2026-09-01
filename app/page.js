@@ -184,7 +184,6 @@ export default function QVaultApp() {
     });
     const [uploadFile, setUploadFile] = useState(null);
     const [selectedImages, setSelectedImages] = useState([]);
-    const [showCatboxTutorial, setShowCatboxTutorial] = useState(false);
 
     // Searchable Dropdown States
     const [teacherSearch, setTeacherSearch] = useState('');
@@ -668,7 +667,6 @@ export default function QVaultApp() {
             } catch (e) {
                 console.error('Upload Error:', e);
                 showToast('Upload Error', e.message, 'error');
-                setShowCatboxTutorial(true);
                 setIsUploading(false);
                 return;
             }
@@ -948,34 +946,11 @@ export default function QVaultApp() {
         try {
             let finalImageUrl = noticeForm.imageUrl;
 
-            // If local file is selected, upload to Supabase Storage
+            // If local file is selected, upload to Google Drive
             if (noticeForm.file) {
-                console.log('Uploading notice image to Supabase Storage:', noticeForm.file.name);
-                const timestamp = Date.now();
-                const randomStr = Math.random().toString(36).substring(2, 8);
-                const extension = noticeForm.file.name.split('.').pop() || 'png';
-                const fileName = `notice_${timestamp}_${randomStr}.${extension}`;
-                const filePath = `notices/${fileName}`;
-
-                const { data: uploadData, error: uploadError } = await supabase.storage
-                    .from('qvault-files')
-                    .upload(filePath, noticeForm.file, {
-                        cacheControl: '365d',
-                        upsert: false
-                    });
-
-                if (uploadError) {
-                    console.error('Supabase notices upload error:', uploadError);
-                    throw new Error('Supabase Storage upload failed: ' + uploadError.message);
-                }
-
-                // Get public URL
-                const { data: urlData } = supabase.storage
-                    .from('qvault-files')
-                    .getPublicUrl(filePath);
-
-                finalImageUrl = urlData.publicUrl;
-                console.log('Notice image uploaded successfully to Supabase Storage:', finalImageUrl);
+                console.log('Uploading notice image to Google Drive:', noticeForm.file.name);
+                finalImageUrl = await uploadFileToStorage(noticeForm.file);
+                console.log('Notice image uploaded successfully to Google Drive:', finalImageUrl);
             }
 
             const noticeData = {
@@ -1062,9 +1037,8 @@ export default function QVaultApp() {
                 return;
             }
             
-            if (file.size > 4.5 * 1024 * 1024) {
-                setShowCatboxTutorial(true);
-                alert('PDF size exceeds 4.5MB limit. Please upload manually to Catbox and paste the link below.');
+            if (file.size > 50 * 1024 * 1024) {
+                alert('PDF size exceeds 50MB limit.');
                 setOutlineForm(prev => ({
                     ...prev,
                     file: null,
@@ -1076,7 +1050,7 @@ export default function QVaultApp() {
             setOutlineForm(prev => ({
                 ...prev,
                 file: file,
-                outlineUrl: 'Selected local PDF file'
+                outlineUrl: file.name
             }));
         }
     };
@@ -1085,7 +1059,7 @@ export default function QVaultApp() {
         e.preventDefault();
         if (!supabase) return;
         if (!outlineForm.outlineUrl && !outlineForm.file) {
-            alert('Please upload a PDF file or paste a direct PDF URL!');
+            alert('Please select a PDF file to upload!');
             return;
         }
         if (!outlineForm.courseCode) {
@@ -1095,22 +1069,20 @@ export default function QVaultApp() {
 
         let finalOutlineUrl = outlineForm.outlineUrl;
 
-        // If local file is uploaded, programmatically upload to storage!
+        // If local file is uploaded, upload to Google Drive!
         if (outlineForm.file) {
-            if (outlineForm.file.size > 4.5 * 1024 * 1024) {
-                setShowCatboxTutorial(true);
-                alert('PDF size exceeds 4.5MB limit. Please upload manually to Catbox and paste the link.');
+            if (outlineForm.file.size > 50 * 1024 * 1024) {
+                alert('PDF size exceeds 50MB limit.');
                 return;
             }
 
             try {
-                showToast('Uploading...', 'Uploading outline PDF to storage...', 'info');
+                showToast('Uploading...', 'Uploading outline PDF to Google Drive...', 'info');
                 finalOutlineUrl = await uploadFileToStorage(outlineForm.file);
                 console.log('Outline uploaded successfully:', finalOutlineUrl);
             } catch (err) {
                 console.error('Outline Upload Error:', err);
-                alert('Failed to upload PDF programmatically: ' + err.message);
-                setShowCatboxTutorial(true);
+                alert('Failed to upload PDF: ' + err.message);
                 return;
             }
         }
@@ -2391,20 +2363,7 @@ export default function QVaultApp() {
                                                         </div>
                                                     </div>
 
-                                                    <div className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-center gap-3">
-                                                        <span className="h-px bg-slate-200 flex-grow"></span> OR <span className="h-px bg-slate-200 flex-grow"></span>
-                                                    </div>
 
-                                                    <div>
-                                                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Notice Image URL</label>
-                                                        <input 
-                                                            type="url" 
-                                                            placeholder="e.g. https://catbox.moe/notice.png" 
-                                                            value={noticeForm.imageUrl && noticeForm.imageUrl.startsWith('data:') ? '' : noticeForm.imageUrl}
-                                                            onChange={e => setNoticeForm(prev => ({ ...prev, imageUrl: e.target.value }))}
-                                                            className="w-full px-4 py-2.5 border border-slate-200 bg-slate-50/50 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all text-sm shadow-sm font-mono text-xs"
-                                                        />
-                                                    </div>
 
                                                     {noticeForm.imageUrl && (
                                                         <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3 animate-in fade-in">
@@ -2567,20 +2526,7 @@ export default function QVaultApp() {
                                                         </div>
                                                     </div>
 
-                                                    <div className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-center gap-3">
-                                                        <span className="h-px bg-slate-200 flex-grow"></span> OR <span className="h-px bg-slate-200 flex-grow"></span>
-                                                    </div>
 
-                                                    <div>
-                                                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">PDF Document URL</label>
-                                                        <input 
-                                                            type="url" 
-                                                            placeholder="e.g. https://catbox.moe/outline.pdf" 
-                                                            value={outlineForm.outlineUrl}
-                                                            onChange={e => setOutlineForm(prev => ({ ...prev, outlineUrl: e.target.value }))}
-                                                            className="w-full px-4 py-2.5 border border-slate-200 bg-slate-50/50 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all text-sm shadow-sm font-mono text-xs"
-                                                        />
-                                                    </div>
 
                                                     {outlineForm.outlineUrl && (
                                                         <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3 animate-in fade-in">
@@ -2868,20 +2814,7 @@ export default function QVaultApp() {
                                                         </div>
                                                     </div>
 
-                                                    <div className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-center gap-3">
-                                                        <span className="h-px bg-slate-200 flex-grow"></span> OR <span className="h-px bg-slate-200 flex-grow"></span>
-                                                    </div>
 
-                                                    <div>
-                                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">PDF Document URL</label>
-                                                        <input 
-                                                            type="url" 
-                                                            placeholder="e.g. https://catbox.moe/outline.pdf" 
-                                                            value={outlineForm.outlineUrl && outlineForm.outlineUrl.startsWith('data:') ? '' : outlineForm.outlineUrl}
-                                                            onChange={e => setOutlineForm(prev => ({ ...prev, outlineUrl: e.target.value }))}
-                                                            className="w-full px-4 py-3 border border-slate-200 bg-slate-50/50 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-rose-500/20 transition-all text-sm shadow-sm font-mono text-xs"
-                                                        />
-                                                    </div>
 
                                                     {outlineForm.outlineUrl && (
                                                         <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3 animate-in fade-in">
