@@ -3136,51 +3136,28 @@ export default function QVaultApp() {
                                             </div>
                                         </>
                                     )}
+                                    {uploadType === 'material' && (
+                                         <div className="space-y-4 bg-slate-50 border border-slate-200/85 p-5 rounded-2xl col-span-1 sm:col-span-2">
+                                             <h4 className="text-xs font-bold text-slate-800 flex items-center gap-2 tracking-wide uppercase">
+                                                 <i className="fas fa-link text-indigo-500 text-sm"></i> Course Materials Link (Optional)
+                                             </h4>
+                                             <div>
+                                                 <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex justify-between items-center">
+                                                     <span>External Materials Link</span>
+                                                     {uploadFormData.matType === 'course_link' && <span className="text-[10px] text-red-500 font-bold tracking-normal lowercase">(Required for Course Link)</span>}
+                                                 </label>
+                                                 <input 
+                                                     value={uploadFormData.courseMaterialsLink || ''} 
+                                                     onChange={e => handleUploadChange('courseMaterialsLink', e.target.value)} 
+                                                     placeholder="e.g. Drive, OneDrive, Dropbox link" 
+                                                     className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none text-sm shadow-sm" 
+                                                 />
+                                             </div>
+                                         </div>
+                                     )}
                                     {uploadType !== 'thesis' && (
-                                        <div className="space-y-4 bg-slate-50 border border-slate-200/85 p-5 rounded-2xl col-span-1 sm:col-span-2">
-                                            <h4 className="text-xs font-bold text-slate-800 flex items-center gap-2 tracking-wide uppercase">
-                                                <i className="fas fa-link text-indigo-500 text-sm"></i> Direct Link Inputs
-                                            </h4>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                {uploadType === 'material' && (
-                                                    <div>
-                                                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex justify-between items-center">
-                                                            <span>Course Materials Link</span>
-                                                            {uploadFormData.matType === 'course_link' && <span className="text-[10px] text-red-500 font-bold tracking-normal lowercase">(Required for Course Link)</span>}
-                                                        </label>
-                                                        <input 
-                                                            value={uploadFormData.courseMaterialsLink || ''} 
-                                                            onChange={e => handleUploadChange('courseMaterialsLink', e.target.value)} 
-                                                            placeholder="e.g. Drive, OneDrive, Dropbox link" 
-                                                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none text-sm shadow-sm" 
-                                                        />
-                                                    </div>
-                                                )}
-                                                <div className={uploadType === 'paper' ? 'sm:col-span-2' : ''}>
-                                                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex justify-between items-center">
-                                                        <span>PDF Upload Link (PDF &gt; 4.5MB)</span>
-                                                        <button 
-                                                            type="button" 
-                                                            onClick={() => setShowCatboxTutorial(true)} 
-                                                            className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 cursor-pointer transition-colors"
-                                                        >
-                                                            <i className="fas fa-play-circle text-xs"></i> Tutorial
-                                                        </button>
-                                                    </label>
-                                                    <div className="relative">
-                                                        <input 
-                                                            value={uploadFormData.pdfUploadLink || ''} 
-                                                            onChange={e => handleUploadChange('pdfUploadLink', e.target.value)} 
-                                                            placeholder="e.g. paste Catbox / Drive link here" 
-                                                            className="w-full pl-4 pr-10 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none text-sm shadow-sm" 
-                                                        />
-                                                        <i className="fas fa-info-circle text-slate-400 absolute right-4 top-4 text-xs" title="If PDF > 4.5MB, upload manually and paste link"></i>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="text-[10px] text-slate-400 italic">
-                                                * Note: If you provide {uploadType === 'material' ? 'either link' : 'a link'}, file/image upload below becomes completely optional. Links save Supabase database storage!
-                                            </div>
+                                        <div className="text-[10px] text-slate-400 italic">
+                                            * Note: If you provide a link, file/image upload below becomes completely optional. Links save Supabase database storage!
                                         </div>
                                     )}
                                     <div className="sm:col-span-2 mt-2">
@@ -3309,96 +3286,7 @@ export default function QVaultApp() {
                 </div>
             )}
 
-            {/* CATBOX TUTORIAL MODAL */}
-            {showCatboxTutorial && (
-                <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
-                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowCatboxTutorial(false)}></div>
-                    <div className="relative bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all max-w-lg w-full z-10 border border-slate-100 flex flex-col max-h-[90vh]">
-                        {/* Header */}
-                        <div className="bg-slate-900 text-white p-6 flex justify-between items-center">
-                            <div>
-                                <h3 className="text-lg font-bold flex items-center gap-2">
-                                    <i className="fas fa-file-invoice text-indigo-400"></i> Manual Large PDF Guide
-                                </h3>
-                                <p className="text-xs text-slate-400 mt-0.5">Step-by-step upload process for PDFs &gt; 4.5 MB</p>
-                            </div>
-                            <button onClick={() => setShowCatboxTutorial(false)} className="text-slate-400 hover:text-white hover:bg-white/10 rounded-full p-2 transition-colors">
-                                <i className="fas fa-times text-lg"></i>
-                            </button>
-                        </div>
-                        
-                        {/* Content */}
-                        <div className="p-6 overflow-y-auto space-y-4">
-                            <div className="p-3.5 bg-indigo-50 border border-indigo-100 rounded-xl text-xs text-indigo-700 leading-relaxed flex gap-3">
-                                <i className="fas fa-exclamation-triangle text-indigo-500 text-base mt-0.5 flex-shrink-0"></i>
-                                <span>
-                                    To maintain high speed and keep Supabase size efficient, files exceeding <strong>4.5 MB</strong> cannot be uploaded directly. Please use this guide to upload manually.
-                                </span>
-                            </div>
 
-                            <div className="space-y-4 pt-1">
-                                <div className="flex gap-3">
-                                    <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</div>
-                                    <div>
-                                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Open Catbox File Upload</h4>
-                                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                                            Visit <a href="https://catbox.moe" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-800 font-bold underline inline-flex items-center gap-1">catbox.moe <i className="fas fa-external-link-alt text-[10px]"></i></a> in a new tab. It is a completely free, anonymous file host.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-3">
-                                    <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</div>
-                                    <div>
-                                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Upload Your PDF</h4>
-                                        <p className="text-xs text-slate-500 mt-1 leading-relaxed font-sans">
-                                            Drag and drop your large PDF onto the site, or click "Select or drop files here" to upload your file.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-3">
-                                    <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</div>
-                                    <div>
-                                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Copy Generated Link</h4>
-                                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                                            Wait for the upload to complete. Once done, a link like <code className="bg-slate-100 px-1.5 py-0.5 rounded text-indigo-600 font-mono text-[11px] font-bold">https://files.catbox.moe/xxxxxx.pdf</code> will appear. Copy it.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-3">
-                                    <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</div>
-                                    <div>
-                                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Paste the Link in QVault</h4>
-                                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                                            Return here and paste that link directly into the <strong>PDF Upload Link</strong> field. You're done!
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Footer */}
-                        <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-                            <a 
-                                href="https://catbox.moe" 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
-                                className="bg-white border border-slate-200 hover:border-slate-300 text-slate-700 text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all flex items-center gap-1.5"
-                            >
-                                <i className="fas fa-rocket text-indigo-500"></i> Open Catbox
-                            </a>
-                            <button 
-                                onClick={() => setShowCatboxTutorial(false)} 
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-md transition-all"
-                            >
-                                Got It
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* ALL NOTICES MODAL */}
             {showAllNoticesModal && (
